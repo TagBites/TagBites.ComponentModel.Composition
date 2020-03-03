@@ -175,14 +175,18 @@ namespace TagBites.ComponentModel.Composition
         }
         public IEnumerable<ExportComponent> GetExports(string contractName, Type contractType)
         {
+            var items = new List<ExportComponent>();
+
             lock (_locker)
             {
                 var exports = _exportTree.TryGetValueDefault(contractType, contractName ?? string.Empty);
 
                 if (exports != null)
                     foreach (var export in exports)
-                        yield return export.Component;
+                        items.Add(export.Component);
             }
+
+            return items;
         }
 
         public IEnumerable<T> GetManyExportInstances<T>(string[] contractNames)
@@ -213,15 +217,16 @@ namespace TagBites.ComponentModel.Composition
             foreach (var export in GetManyExports(contractNames, contractType))
                 yield return export.Instance;
         }
-        public IEnumerable<ExportComponent> GetManyExports(string[] contractNames, Type contractType)
+        public IList<ExportComponent> GetManyExports(string[] contractNames, Type contractType)
         {
+            if (contractNames == null || contractNames.Length == 0)
+                return Array.Empty<ExportComponent>();
+
+            var items = new List<ExportComponent>();
+            var names = new HashSet<string>();
+
             lock (_locker)
             {
-                if (contractNames == null || contractNames.Length == 0)
-                    yield break;
-
-                var names = new HashSet<string>();
-
                 // ReSharper disable once ForCanBeConvertedToForeach
                 for (var i = 0; i < contractNames.Length; i++)
                 {
@@ -232,14 +237,18 @@ namespace TagBites.ComponentModel.Composition
 
                         if (exports != null)
                             foreach (var export in exports)
-                                yield return export.Component;
+                                items.Add(export.Component);
                     }
                 }
             }
+
+            return items;
         }
 
-        public IEnumerable<ExportComponent> GetExports(Assembly assembly)
+        public IList<ExportComponent> GetExports(Assembly assembly)
         {
+            var items = new List<ExportComponent>();
+
             lock (_locker)
             {
                 foreach (var exports in _exportTree.Values)
@@ -247,19 +256,25 @@ namespace TagBites.ComponentModel.Composition
                     {
                         var component = export.Component;
                         if (component.OriginAssembly == assembly)
-                            yield return component;
+                            items.Add(component);
                     }
             }
+
+            return items;
         }
-        public IEnumerable<ExportComponentDefinition> GetExportsDefinitions(Assembly assembly)
+        public IList<ExportComponentDefinition> GetExportsDefinitions(Assembly assembly)
         {
+            var items = new List<ExportComponentDefinition>();
+
             lock (_locker)
             {
                 foreach (var exports in _exportTree.Values)
                     foreach (var export in exports)
                         if (export.Definition.ValueType.GetTypeInfo().Assembly == assembly)
-                            yield return export.Definition;
+                            items.Add(export.Definition);
             }
+
+            return items;
         }
 
         #endregion
@@ -309,6 +324,8 @@ namespace TagBites.ComponentModel.Composition
         }
         public void LoadAssembly(Assembly assembly)
         {
+            var changedContractTypes = new HashSet<Type>();
+
             lock (_locker)
             {
                 if (!_loadedAssemblies.Add(assembly))
@@ -373,8 +390,6 @@ namespace TagBites.ComponentModel.Composition
                 }
 
                 // Apply changes
-                var changedContractTypes = new HashSet<Type>();
-
                 lock (_locker)
                 {
                     foreach (var definition in items)
@@ -393,9 +408,9 @@ namespace TagBites.ComponentModel.Composition
                     if (loadDirectly)
                         _loadedAssemblyOutsideOfCache = true;
                 }
-
-                RaiseExportCollectionChanged(changedContractTypes.ToArray());
             }
+
+            RaiseExportCollectionChanged(changedContractTypes.ToArray());
         }
         public void UnloadAssembly(Assembly assembly)
         {
@@ -747,6 +762,10 @@ namespace TagBites.ComponentModel.Composition
                 Component = component;
             }
         }
+
+        #endregion
+
+        #region Cache classes
 
         private class CacheInfoModel
         {

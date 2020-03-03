@@ -11,6 +11,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.ComponentModel.Composition" Version="4.6.0" />
   </ItemGroup>
