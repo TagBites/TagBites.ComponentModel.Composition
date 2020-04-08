@@ -64,10 +64,10 @@ namespace TagBites.ComponentModel.Composition
                 ? export.Instance
                 : default;
         }
-        public T TryCreateExportInstance<T>(Uri location)
+        public T CreateExportInstance<T>(Uri location)
         {
             var export = GetExport<T>(location);
-            return export != null && !export.IsDynamic
+            return export != null
                 ? export.CreateInstance()
                 : default;
         }
@@ -79,16 +79,12 @@ namespace TagBites.ComponentModel.Composition
         public object GetExportInstance(Uri location)
         {
             var export = GetExport(location);
-            return export != null
-                ? export.Instance
-                : null;
+            return export?.Instance;
         }
-        public object TryCreateExportInstance(Uri location)
+        public object CreateExportInstance(Uri location)
         {
             var export = GetExport(location);
-            return export != null && !export.IsDynamic
-                ? export.CreateInstance()
-                : null;
+            return export?.CreateInstance();
         }
         public ExportComponent GetExport(Uri location)
         {
@@ -114,15 +110,14 @@ namespace TagBites.ComponentModel.Composition
             foreach (var export in GetExports<T>(contractName))
                 yield return export.Instance;
         }
-        public IEnumerable<T> TryCreateExportInstances<T>()
+        public IEnumerable<T> CreateExportInstances<T>()
         {
-            return TryCreateExportInstances<T>(null);
+            return CreateExportInstances<T>(null);
         }
-        public IEnumerable<T> TryCreateExportInstances<T>(string contractName)
+        public IEnumerable<T> CreateExportInstances<T>(string contractName)
         {
             foreach (var export in GetExports<T>(contractName))
-                if (!export.IsDynamic)
-                    yield return export.CreateInstance();
+                yield return export.CreateInstance();
         }
         public IEnumerable<ExportComponent<T>> GetExports<T>()
         {
@@ -148,19 +143,18 @@ namespace TagBites.ComponentModel.Composition
             foreach (var export in GetExports(contractName, contractType))
                 yield return export.Instance;
         }
-        public IEnumerable<object> TryCreateExportInstances(ContractDefinition contract)
+        public IEnumerable<object> CreateExportInstances(ContractDefinition contract)
         {
-            return TryCreateExportInstances(contract.ContactName, contract.ContactType);
+            return CreateExportInstances(contract.ContactName, contract.ContactType);
         }
-        public IEnumerable<object> TryCreateExportInstances(Type contractType)
+        public IEnumerable<object> CreateExportInstances(Type contractType)
         {
-            return TryCreateExportInstances(null, contractType);
+            return CreateExportInstances(null, contractType);
         }
-        public IEnumerable<object> TryCreateExportInstances(string contractName, Type contractType)
+        public IEnumerable<object> CreateExportInstances(string contractName, Type contractType)
         {
             foreach (var export in GetExports(contractName, contractType))
-                if (!export.IsDynamic)
-                    yield return export.CreateInstance();
+                yield return export.CreateInstance();
         }
         public IEnumerable<ExportComponent> GetExports(ContractDefinition contract)
         {
@@ -197,8 +191,7 @@ namespace TagBites.ComponentModel.Composition
         public IEnumerable<T> TryCreateManyExportInstances<T>(string[] contractNames)
         {
             foreach (var export in GetManyExports<T>(contractNames))
-                if (!export.IsDynamic)
-                    yield return export.CreateInstance();
+                yield return export.CreateInstance();
         }
         public IEnumerable<ExportComponent<T>> GetManyExports<T>(string[] contractNames)
         {
@@ -209,8 +202,7 @@ namespace TagBites.ComponentModel.Composition
         public IEnumerable<object> TryCreateManyExportInstances(string[] contractNames, Type contractType)
         {
             foreach (var export in GetManyExports(contractNames, contractType))
-                if (!export.IsDynamic)
-                    yield return export.CreateInstance();
+                yield return export.CreateInstance();
         }
         public IEnumerable<object> GetManyExportInstances(string[] contractNames, Type contractType)
         {
@@ -384,7 +376,7 @@ namespace TagBites.ComponentModel.Composition
                                 if (!contractType.GetTypeInfo().IsAssignableFrom(valueType))
                                     continue;
 
-                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, valueType, null);
+                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, valueType);
                                 items.Add(definition);
                             }
                 }
@@ -738,7 +730,7 @@ namespace TagBites.ComponentModel.Composition
                     return _component;
                 }
             }
-            public Assembly OriginAssembly => Definition.ValueType.GetTypeInfo().Assembly;
+            public Assembly OriginAssembly => Definition.ValueTypeAssembly;
             public bool IsRegistered => false;
 
             public ExportData(ExportComponentDefinition definition)
@@ -748,7 +740,7 @@ namespace TagBites.ComponentModel.Composition
         }
         private class RegisteredExportData : IExportData
         {
-            public ExportComponentDefinition Definition { get; }
+            public ExportComponentDefinition Definition => Component.Definition;
             public ExportComponent Component { get; }
             public Assembly OriginAssembly => Component.OriginAssembly;
             public bool IsRegistered => true;
@@ -758,7 +750,6 @@ namespace TagBites.ComponentModel.Composition
                 if (component == null)
                     throw new ArgumentNullException(nameof(component));
 
-                Definition = new ExportComponentDefinition(component.ContractName, component.ContractType, component.ValueType, component.Metadata);
                 Component = component;
             }
         }

@@ -1,45 +1,55 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Reflection;
-using TagBites.Utils;
 
 namespace TagBites.ComponentModel.Composition
 {
     public class ExportComponent
     {
-        internal static readonly IDictionary<string, object> EmptyMetadata = new ReadOnlyDictionary<string, object>(new Dictionary<string, object>());
-
-        private string _name;
-        private Type _valueType;
-        private readonly object _initInstance;
+        private readonly Func<object> _instanceProvider;
         private WeakReference _instance;
-        private Uri _location;
+        private readonly Assembly _originAssembly;
 
-        public string Name => _name ??= ValueType.FullName;
-        public string FullName =>
-            Name == ValueType.FullName
-                ? string.Format("{0} - {1}", Name, OriginName)
-                : string.Format("{0} - {1} - {2}", Name, ValueType.FullName, OriginName);
+        /// <summary>
+        /// Export definition.
+        /// </summary>
+        internal ExportComponentDefinition Definition { get; }
+        /// <summary>
+        /// Gets contract name.
+        /// </summary>
+        public string ContractName => Definition.ContractName;
+        /// <summary>
+        /// Gets contract type.
+        /// </summary>
+        public Type ContractType => Definition.ContractType;
+        /// <summary>
+        /// Gets value type.
+        /// </summary>
+        public Type ValueType => Definition.ValueType;
+        /// <summary>
+        /// Gets value type assembly.
+        /// </summary>
+        public Assembly ValueTypeAssembly => Definition.ValueTypeAssembly;
+        /// <summary>
+        /// Gets full name of value type.
+        /// </summary>
+        public string ValueTypeFullName => Definition.ValueTypeFullName;
+        /// <summary>
+        /// Gets location.
+        /// </summary>
+        public Uri Location => Definition.Location;
 
-        public string ContractName { get; }
-        public Type ContractType { get; }
-        public Type ValueType
-        {
-            get
-            {
-                if (_valueType == null)
-                    _valueType = Instance.GetType();
+        /// <summary>
+        /// Gets origin assembly.
+        /// </summary>
+        public Assembly OriginAssembly => _originAssembly ?? ValueTypeAssembly;
 
-                return _valueType;
-            }
-        }
+        /// <summary>
+        /// Gets instance.
+        /// </summary>
         public object Instance
         {
             get
             {
-                if (_initInstance != null)
-                    return _initInstance;
                 object target = null;
 
                 if (_instance != null)
@@ -47,126 +57,73 @@ namespace TagBites.ComponentModel.Composition
 
                 if (target == null)
                 {
-                    target = Activator.CreateInstance(ValueType);
+                    target = CreateInstance();
                     _instance = new WeakReference(target);
                 }
 
                 return target;
             }
         }
-        public IDictionary<string, object> Metadata { get; }
-
-        public Assembly OriginAssembly { get; }
-        public string OriginName => AssemblyUtils.GetFullFriendlyName(OriginAssembly);
-        public Uri Location
-        {
-            get
-            {
-                if (_location == null && OriginAssembly == ValueType.GetTypeInfo().Assembly)
-                    _location = ExportComponentDefinition.GetDefaultUri(ContractType, ContractName, ValueType);
-
-                return _location;
-            }
-        }
-        public bool IsDynamic { get; }
 
         internal ExportComponent(ExportComponentDefinition definition)
-            : this(definition.ContractName, definition.ContractType, definition.ValueType)
         {
-            Metadata = definition.Metadata;
-            _location = definition.Location;
+            Definition = definition ?? throw new ArgumentNullException(nameof(definition));
         }
-        public ExportComponent(string contractName, Type contractType, Type valueType)
-            : this(contractName, contractType, valueType, valueType.GetTypeInfo().Assembly, null)
+        internal ExportComponent(string contractName, Type contractType, Type valueType, Uri location = null)
+            : this(new ExportComponentDefinition(contractName, contractType, valueType, location))
         { }
-        public ExportComponent(string contractName, Type contractType, Type valueType, string name)
-            : this(contractName, contractType, valueType, valueType.GetTypeInfo().Assembly, name)
-        { }
-        public ExportComponent(string contractName, Type contractType, Type valueType, Assembly originAssembly, string name)
+        internal ExportComponent(string contractName, Type contractType, Type valueType, Uri location, Func<object> instanceProvider, Assembly originAssembly)
+            : this(new ExportComponentDefinition(contractName, contractType, valueType, location))
         {
-            if (contractType == null)
-                throw new ArgumentNullException(nameof(contractType));
-            if (valueType == null)
-                throw new ArgumentNullException(nameof(valueType));
-            if (originAssembly == null)
-                throw new ArgumentNullException(nameof(originAssembly));
-
-            _name = name;
-
-            ContractName = contractName;
-            ContractType = contractType;
-            _valueType = valueType;
-
-            OriginAssembly = originAssembly;
-        }
-        public ExportComponent(string contractName, Type contractType, object instance)
-            : this(contractName, contractType, instance, instance.GetType().GetTypeInfo().Assembly, null)
-        { }
-        public ExportComponent(string contractName, Type contractType, object instance, string name)
-            : this(contractName, contractType, instance, instance.GetType().GetTypeInfo().Assembly, name)
-        { }
-        public ExportComponent(string contractName, Type contractType, object instance, Assembly originAssembly, string name)
-        {
-            if (contractType == null)
-                throw new ArgumentNullException(nameof(contractType));
-            if (instance == null)
-                throw new ArgumentNullException(nameof(instance));
-            if (originAssembly == null)
-                throw new ArgumentNullException(nameof(originAssembly));
-
-            _name = name;
-
-            ContractName = contractName;
-            ContractType = contractType;
-            _initInstance = instance;
-
-            OriginAssembly = originAssembly;
-            IsDynamic = true;
+            _instanceProvider = instanceProvider;
+            _originAssembly = originAssembly;
         }
 
 
+        /// <summary>
+        /// Creates instance.
+        /// </summary>
+        /// <returns>New instance.</returns>
         public object CreateInstance()
         {
-            if (IsDynamic)
-                throw new InvalidOperationException("Can not create instance of dynamic component.");
-
-            return Activator.CreateInstance(ValueType);
+            return _instanceProvider != null
+                    ? _instanceProvider()
+                    : Activator.CreateInstance(ValueType);
         }
 
         /// <inheritdoc />
         public override string ToString()
         {
-            return Name;
+            return ValueTypeFullName;
         }
     }
 
     public sealed class ExportComponent<T> : ExportComponent
     {
+        /// <summary>
+        /// Creates instance.
+        /// </summary>
+        /// <returns>New instance.</returns>
         public new T Instance => (T)base.Instance;
 
         public ExportComponent(ExportComponentDefinition definition)
             : base(definition)
         { }
-        public ExportComponent(string contractName, Type valueType)
-            : base(contractName, typeof(T), valueType)
+        public ExportComponent(string contractName, Type contractType, Type valueType, Uri location = null)
+            : base(contractName, contractType, valueType, location)
         { }
-        public ExportComponent(string contractName, Type valueType, string name)
-            : base(contractName, typeof(T), valueType, name)
-        { }
-        public ExportComponent(string contractName, Type valueType, Assembly originAssembly, string name)
-            : base(contractName, typeof(T), valueType, originAssembly, name)
-        { }
-        public ExportComponent(string contractName, T instance)
-            : base(contractName, typeof(T), instance)
-        { }
-        public ExportComponent(string contractName, T instance, string name)
-            : base(contractName, typeof(T), instance, name)
-        { }
-        public ExportComponent(string contractName, T instance, Assembly originAssembly, string name)
-            : base(contractName, typeof(T), instance, originAssembly, name)
-        { }
+        public ExportComponent(string contractName, Type contractType, Type valueType, Uri location, Func<T> instanceProvider, Assembly originAssembly)
+            : base(contractName, contractType, valueType, location, () => instanceProvider(), originAssembly)
+        {
+            if (instanceProvider == null)
+                throw new ArgumentNullException(nameof(instanceProvider));
+        }
 
 
+        /// <summary>
+        /// Creates instance.
+        /// </summary>
+        /// <returns>New instance.</returns>
         public new T CreateInstance()
         {
             return (T)base.CreateInstance();
