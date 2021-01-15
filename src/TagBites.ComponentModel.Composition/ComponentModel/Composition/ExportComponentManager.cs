@@ -369,9 +369,6 @@ namespace TagBites.ComponentModel.Composition
                         if (!valueType.IsInterface && !valueType.IsAbstract)
                             foreach (var exportInfo in valueType.GetCustomAttributes<ExportAttribute>(false))
                             {
-                                if (!HasDefaultConstructor(valueType))
-                                    continue;
-
                                 var contractType = exportInfo.ContractType ?? valueType;
                                 if (!contractType.GetTypeInfo().IsAssignableFrom(valueType))
                                     continue;
