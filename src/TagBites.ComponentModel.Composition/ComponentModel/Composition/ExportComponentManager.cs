@@ -6,6 +6,9 @@ using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+#if NETCOREAPP
+using System.Runtime.Loader;
+#endif
 using TagBites.Collections;
 
 namespace TagBites.ComponentModel.Composition
@@ -369,11 +372,13 @@ namespace TagBites.ComponentModel.Composition
                         if (!valueType.IsInterface && !valueType.IsAbstract)
                             foreach (var exportInfo in valueType.GetCustomAttributes<ExportAttribute>(false))
                             {
-                                var contractType = exportInfo.ContractType ?? valueType;
-                                if (!contractType.GetTypeInfo().IsAssignableFrom(valueType))
+                                var vt = valueType;
+                                var contractType = exportInfo.ContractType ?? vt;
+
+                                if (!contractType.GetTypeInfo().IsAssignableFrom(vt))
                                     continue;
 
-                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, valueType);
+                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, vt);
                                 items.Add(definition);
                             }
                 }
@@ -650,6 +655,20 @@ namespace TagBites.ComponentModel.Composition
             foreach (var loadedAssembly in loadedAssemblies)
                 if (!assemblies.ContainsKey(loadedAssembly))
                     assemblies.Add(loadedAssembly, new List<ExportComponentDefinition>());
+
+            //{
+            //    // Remove duplicated assemblies (the same name and version)
+            //    var duplicates = new Dictionary<string, Assembly>();
+
+            //    foreach (var assembly in assemblies.Keys.ToList())
+            //        if (!duplicates.ContainsKey(assembly.FullName))
+            //            duplicates.Add(assembly.FullName, assembly);
+            //        else
+            //        {
+            //            assemblies.Remove(assembly);
+            //            assemblies.Remove(duplicates[assembly.FullName]);
+            //        }
+            //}
 
             var cacheInfo = new CacheInfoModel();
 
