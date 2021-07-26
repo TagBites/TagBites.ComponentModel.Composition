@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Description>Container and manager to simplify exports lookup.</Description>
+    <PackageTags></PackageTags>
+
+    <PackageProjectUrl>https://www.tagbites.com/</PackageProjectUrl>
+    <PackageIconUrl></PackageIconUrl>
+
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/TagBites/TagBites.ComponentModel.Composition.git</RepositoryUrl>
+  </PropertyGroup>
+</Project>
