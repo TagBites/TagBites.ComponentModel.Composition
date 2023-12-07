@@ -1,4 +1,4 @@
-# TBS.ComponentModel.Composition
+# TagBites.ComponentModel.Composition
 
 [![Nuget](https://img.shields.io/nuget/v/TagBites.ComponentModel.Composition.svg)](https://www.nuget.org/packages/TagBites.ComponentModel.Composition/)
 [![License](https://img.shields.io/github/license/TagBites/TagBites.ComponentModel.Composition)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE)
