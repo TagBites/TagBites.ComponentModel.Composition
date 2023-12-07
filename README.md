@@ -1,7 +1,7 @@
 # TBS.ComponentModel.Composition
 
 [![Nuget](https://img.shields.io/nuget/v/TagBites.ComponentModel.Composition.svg)](https://www.nuget.org/packages/TagBites.ComponentModel.Composition/)
-[![License](http://img.shields.io/github/license/TagBites/TagBites.ComponentModel.Composition)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/TagBites/TagBites.ComponentModel.Composition)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE)
 
 A .NET export container and manager designed to simplify access to exported types. Well suited for plugin integration. Supports caching to speed up application startup, eliminating the necessity to load and analyze all assemblies.
 
