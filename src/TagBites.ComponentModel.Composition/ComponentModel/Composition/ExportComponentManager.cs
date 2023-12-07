@@ -326,81 +326,89 @@ namespace TagBites.ComponentModel.Composition
                 if (!_loadedAssemblies.Add(assembly))
                     return;
 
-                var items = new List<ExportComponentDefinition>();
-                var loadDirectly = true;
-
-                // Load form cache
-                var cache = GetAssemblyCacheModel(assembly);
-                if (cache != null)
+                try
                 {
-                    loadDirectly = false;
-                    var map = new Dictionary<string, Type>();
-                    try
+                    var items = new List<ExportComponentDefinition>();
+                    var loadDirectly = true;
+
+                    // Load form cache
+                    var cache = GetAssemblyCacheModel(assembly);
+                    if (cache != null)
                     {
-                        foreach (var export in cache.Exports)
+                        loadDirectly = false;
+                        var map = new Dictionary<string, Type>();
+                        try
                         {
-                            if (!map.TryGetValue(export.ContractType, out var contractType))
+                            foreach (var export in cache.Exports)
                             {
-                                contractType = Type.GetType(export.ContractType);
-                                if (contractType == null)
+                                if (!map.TryGetValue(export.ContractType, out var contractType))
                                 {
-                                    loadDirectly = true;
-                                    break;
+                                    contractType = Type.GetType(export.ContractType);
+                                    if (contractType == null)
+                                    {
+                                        loadDirectly = true;
+                                        break;
+                                    }
+
+                                    map.Add(export.ContractType, contractType);
                                 }
 
-                                map.Add(export.ContractType, contractType);
-                            }
-
-                            var definition = new ExportComponentDefinition(export.ContractName ?? string.Empty, contractType, assembly, export.ValueType, export.Location);
-                            items.Add(definition);
-                        }
-                    }
-                    catch
-                    {
-                        loadDirectly = true;
-                    }
-                }
-
-                // Load from assembly
-                if (loadDirectly)
-                {
-                    items.Clear();
-
-                    var types = assembly.GetTypes();
-
-                    foreach (var valueType in types)
-                        if (!valueType.IsInterface && !valueType.IsAbstract)
-                            foreach (var exportInfo in valueType.GetCustomAttributes<ExportAttribute>(false))
-                            {
-                                var vt = valueType;
-                                var contractType = exportInfo.ContractType ?? vt;
-
-                                if (!contractType.GetTypeInfo().IsAssignableFrom(vt))
-                                    continue;
-
-                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, vt);
+                                var definition = new ExportComponentDefinition(export.ContractName ?? string.Empty, contractType, assembly, export.ValueType, export.Location);
                                 items.Add(definition);
                             }
-                }
-
-                // Apply changes
-                lock (_locker)
-                {
-                    foreach (var definition in items)
-                    {
-                        if (_exports.ContainsKey(definition.Location))
-                            continue;
-
-                        var data = new ExportData(definition);
-
-                        _exports.Add(definition.Location, data);
-                        _exportTree.Add(definition.ContractType, definition.ContractName ?? string.Empty, data);
-
-                        changedContractTypes.Add(definition.ContractType);
+                        }
+                        catch
+                        {
+                            loadDirectly = true;
+                        }
                     }
 
+                    // Load from assembly
                     if (loadDirectly)
-                        _loadedAssemblyOutsideOfCache = true;
+                    {
+                        items.Clear();
+
+                        var types = assembly.GetTypes();
+
+                        foreach (var valueType in types)
+                            if (!valueType.IsInterface && !valueType.IsAbstract)
+                                foreach (var exportInfo in valueType.GetCustomAttributes<ExportAttribute>(false))
+                                {
+                                    var vt = valueType;
+                                    var contractType = exportInfo.ContractType ?? vt;
+
+                                    if (!contractType.GetTypeInfo().IsAssignableFrom(vt))
+                                        continue;
+
+                                    var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, vt);
+                                    items.Add(definition);
+                                }
+                    }
+
+                    // Apply changes
+                    lock (_locker)
+                    {
+                        foreach (var definition in items)
+                        {
+                            if (_exports.ContainsKey(definition.Location))
+                                continue;
+
+                            var data = new ExportData(definition);
+
+                            _exports.Add(definition.Location, data);
+                            _exportTree.Add(definition.ContractType, definition.ContractName ?? string.Empty, data);
+
+                            changedContractTypes.Add(definition.ContractType);
+                        }
+
+                        if (loadDirectly)
+                            _loadedAssemblyOutsideOfCache = true;
+                    }
+                }
+                catch
+                {
+                    UnloadAssembly(assembly);
+                    throw;
                 }
             }
 
