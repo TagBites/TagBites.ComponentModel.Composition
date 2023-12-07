@@ -1,12 +1,17 @@
 <Project>
   <PropertyGroup>
-    <Description>Container and manager to simplify exports lookup.</Description>
-    <PackageTags></PackageTags>
+    <Description>A .NET export container and manager designed to simplify access to exported types. Well suited for plugin integration.</Description>
+    <PackageTags>.NET; export; container; MEF</PackageTags>
 
-    <PackageProjectUrl>https://www.tagbites.com/</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/TagBites/TagBites.ComponentModel.Composition</PackageProjectUrl>
     <PackageIconUrl></PackageIconUrl>
+
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/TagBites/TagBites.ComponentModel.Composition.git</RepositoryUrl>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 </Project>

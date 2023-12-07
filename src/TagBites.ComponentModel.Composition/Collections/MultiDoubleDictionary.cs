@@ -1,60 +1,59 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 
-namespace TagBites.Collections
+namespace TagBites.Collections;
+
+internal class MultiDoubleDictionary<TKeyFirst, TKeySecond, TCollection, TValue> : DoubleDictionary<TKeyFirst, TKeySecond, TCollection>
+    where TCollection : ICollection<TValue>, new()
 {
-    internal class MultiDoubleDictionary<TKeyFirst, TKeySecond, TCollection, TValue> : DoubleDictionary<TKeyFirst, TKeySecond, TCollection>
-        where TCollection : ICollection<TValue>, new()
+    public bool ContainsValue(TValue value)
     {
-        public bool ContainsValue(TValue value)
-        {
-            return Values.Any(collection => collection.Contains(value));
-        }
-        public bool ContainsValue(TKeyFirst firstKey, TKeySecond secondKey, TValue value)
-        {
-            var collection = TryGetValueDefault(firstKey, secondKey);
-            if (collection != null)
-                return collection.Contains(value);
+        return Values.Any(collection => collection.Contains(value));
+    }
+    public bool ContainsValue(TKeyFirst firstKey, TKeySecond secondKey, TValue value)
+    {
+        var collection = TryGetValueDefault(firstKey, secondKey);
+        if (collection != null)
+            return collection.Contains(value);
 
-            return false;
-        }
+        return false;
+    }
 
-        public void Add(TKeyFirst firstKey, TKeySecond secondKey, TValue value)
+    public void Add(TKeyFirst firstKey, TKeySecond secondKey, TValue value)
+    {
+        var collection = TryGetValueDefault(firstKey, secondKey);
+        if (collection == null)
         {
-            var collection = TryGetValueDefault(firstKey, secondKey);
-            if (collection == null)
-            {
-                collection = new TCollection();
-                Set(firstKey, secondKey, collection);
-            }
-
-            collection.Add(value);
-        }
-        public bool Remove(TKeyFirst firstKey, TKeySecond secondKey, TValue value)
-        {
-            var collection = TryGetValueDefault(firstKey, secondKey);
-            if (collection != null)
-                return collection.Remove(value);
-
-            return false;
+            collection = new TCollection();
+            Set(firstKey, secondKey, collection);
         }
 
-        public int GetValueCount()
-        {
-            var count = 0;
+        collection.Add(value);
+    }
+    public bool Remove(TKeyFirst firstKey, TKeySecond secondKey, TValue value)
+    {
+        var collection = TryGetValueDefault(firstKey, secondKey);
+        if (collection != null)
+            return collection.Remove(value);
 
-            foreach (var collection in Values)
-                count += collection.Count;
+        return false;
+    }
 
-            return count;
-        }
-        public int GetValueCount(TKeyFirst firstKey, TKeySecond secondKey)
-        {
-            var collection = TryGetValueDefault(firstKey, secondKey);
-            if (collection != null)
-                return collection.Count;
+    public int GetValueCount()
+    {
+        var count = 0;
 
-            return 0;
-        }
+        foreach (var collection in Values)
+            count += collection.Count;
+
+        return count;
+    }
+    public int GetValueCount(TKeyFirst firstKey, TKeySecond secondKey)
+    {
+        var collection = TryGetValueDefault(firstKey, secondKey);
+        if (collection != null)
+            return collection.Count;
+
+        return 0;
     }
 }

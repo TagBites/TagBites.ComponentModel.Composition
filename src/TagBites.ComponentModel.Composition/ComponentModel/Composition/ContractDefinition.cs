@@ -1,49 +1,36 @@
-﻿using System;
+#nullable enable
+using System;
 
-namespace TagBites.ComponentModel.Composition
+namespace TagBites.ComponentModel.Composition;
+
+public sealed class ContractDefinition
 {
-    public class ContractDefinition
+    public string? ContactName { get; }
+    public Type ContactType { get; }
+
+    public ContractDefinition(string? contactName, Type contactType)
     {
-        public string ContactName { get; }
-        public Type ContactType { get; }
-
-        public ContractDefinition(string contactName, Type contactType)
-        {
-            if (contactType == null)
-                throw new ArgumentNullException(nameof(contactType));
-            ContactName = contactName;
-            ContactType = contactType;
-        }
+        ContactName = contactName;
+        ContactType = contactType ?? throw new ArgumentNullException(nameof(contactType));
+    }
 
 
-        /// <inheritdoc />
-        public override int GetHashCode()
+    private bool Equals(ContractDefinition other)
+    {
+        return ContactName == other.ContactName && ContactType == other.ContactType;
+    }
+    public override bool Equals(object? obj)
+    {
+        return ReferenceEquals(this, obj) || obj is ContractDefinition other && Equals(other);
+    }
+    public override int GetHashCode()
+    {
+        unchecked
         {
-            return (ContactName != null ? ContactName.GetHashCode() : 0) ^ ContactType.GetHashCode();
-        }
-        /// <inheritdoc />
-        public override bool Equals(object obj)
-        {
-            var contract = obj as ContractDefinition;
-            return contract != null && contract.ContactName == ContactName && contract.ContactType == ContactType;
-        }
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            return string.IsNullOrEmpty(ContactName)
-                ? ContactType.FullName ?? ContactType.Name
-                : $"{ContactName} ({ContactType.FullName})";
-        }
-
-        public static bool operator ==(ContractDefinition left, ContractDefinition right)
-        {
-            return ReferenceEquals(left, null)
-                ? ReferenceEquals(right, null)
-                : (!ReferenceEquals(right, null) && left.ContactName == right.ContactName && left.ContactType == right.ContactType);
-        }
-        public static bool operator !=(ContractDefinition left, ContractDefinition right)
-        {
-            return !(left == right);
+            return ((ContactName != null ? ContactName.GetHashCode() : 0) * 397) ^ ContactType.GetHashCode();
         }
     }
+
+    public static bool operator ==(ContractDefinition? left, ContractDefinition? right) => Equals(left, right);
+    public static bool operator !=(ContractDefinition? left, ContractDefinition? right) => !Equals(left, right);
 }

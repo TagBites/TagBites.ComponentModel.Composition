@@ -1,10 +1,12 @@
-﻿<Project>
+<Project>
 
   <!-- Company/Copyright -->
   <PropertyGroup>
     <Company>Tag Bites sp. z o.o.</Company>
     <Authors>Tag Bites sp. z o.o.</Authors>
-    <Copyright>Tag Bites sp. z o.o. © 2012-2021</Copyright>
+    <CopyrightSinceYear>2012</CopyrightSinceYear>
+
+    <Copyright>© $(CopyrightSinceYear)-$([System.DateTime]::Today.ToString(`yyyy`)) $(Company)</Copyright>
   </PropertyGroup>
 
   <!-- Bin/Obj directories -->
@@ -19,6 +21,11 @@
     <LangVersion>latest</LangVersion>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!-- Documentation -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <!-- Warnings -->
@@ -36,9 +43,20 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);*.csproj.DotSettings</DefaultItemExcludes>
   </PropertyGroup>
 
+  <!-- Usings -->
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.Collections" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+    <Using Include="JetBrains.Annotations" />
+  </ItemGroup>
+
   <!-- Includes -->
   <Import Condition="exists('Version.props')" Project="Version.props" />
-  <Import Condition="exists('Licensing.props')" Project="Licensing.props" /> 
   <Import Condition="exists('Package.props')" Project="Package.props" /> 
 
 </Project>
