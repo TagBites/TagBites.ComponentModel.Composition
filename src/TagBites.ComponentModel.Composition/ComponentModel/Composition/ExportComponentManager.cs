@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using JetBrains.Annotations;
 #if NETCOREAPP
 using System.Runtime.Loader;
 #endif
@@ -32,6 +27,7 @@ public class ExportComponentManager
 
     private readonly object _locker = new();
     private readonly HashSet<Assembly> _loadedAssemblies = new();
+    private readonly List<(Assembly Assembly, List<IExportData> Removed)> _removedExports = new();
     private readonly Dictionary<Uri, IExportData> _exports = new();
     private readonly MultiDoubleDictionary<Type, string, List<IExportData>, IExportData> _exportTree = new();
 
@@ -101,6 +97,9 @@ public class ExportComponentManager
             _exports.TryGetValue(location, out var data);
             if (data == null)
                 return null;
+
+            while (data.OverrideBy != null)
+                data = data.OverrideBy;
 
             return data.Component;
         }
@@ -322,6 +321,7 @@ public class ExportComponentManager
     public void LoadAssembly(Assembly assembly)
     {
         var changedContractTypes = new HashSet<Type>();
+        var duplicateUriHandling = assembly.GetCustomAttribute<AssemblyExportSettingsAttribute>()?.DuplicateUriHandling ?? ExportDuplicateUriHandling.SkipCurrent;
 
         lock (_locker)
         {
@@ -390,18 +390,44 @@ public class ExportComponentManager
                 // Apply changes
                 lock (_locker)
                 {
+                    List<IExportData> removed = null;
+
                     foreach (var definition in items)
                     {
-                        if (_exports.ContainsKey(definition.Location))
+                        if (_exports.TryGetValue(definition.Location, out var existing) && duplicateUriHandling == ExportDuplicateUriHandling.SkipCurrent)
                             continue;
 
                         var data = new ExportData(definition);
 
-                        _exports.Add(definition.Location, data);
+                        if (existing == null)
+                            _exports.Add(definition.Location, data);
+                        else if (duplicateUriHandling == ExportDuplicateUriHandling.OverrideExisting)
+                        {
+                            while (existing.OverrideBy != null)
+                                existing = existing.OverrideBy;
+
+                            existing.OverrideBy = data;
+                        }
+                        else
+                        {
+                            removed ??= new List<IExportData>(2);
+                            removed.Add(existing);
+
+                            UnregisterCore(existing.Component, true);
+
+                            while (_exports.TryGetValue(definition.Location, out existing))
+                                UnregisterCore(existing.Component, true);
+
+                            _exports.Add(definition.Location, data);
+                        }
+
                         _exportTree.Add(definition.ContractType, definition.ContractName ?? string.Empty, data);
 
                         changedContractTypes.Add(definition.ContractType);
                     }
+
+                    if (removed != null)
+                        _removedExports.Add((assembly, removed));
 
                     if (loadDirectly)
                         _loadedAssemblyOutsideOfCache = true;
@@ -428,19 +454,56 @@ public class ExportComponentManager
             foreach (var collection in _exportTree.Values)
             {
                 for (var i = collection.Count - 1; i >= 0; i--)
-                    if (collection[i].OriginAssembly == assembly)
+                {
+                    var item = collection[i];
+                    if (item.OriginAssembly == assembly)
                     {
-                        changedContractTypes.Add(collection[i].Definition.ContractType);
-                        _exports.Remove(collection[i].Definition.Location);
+                        changedContractTypes.Add(item.Definition.ContractType);
                         collection.RemoveAt(i);
+
+                        RemoveLocation(item);
                     }
+                }
             }
+
+            var removed = _removedExports.FirstOrDefault(x => x.Assembly == assembly).Removed;
+            if (removed != null)
+                foreach (var data in removed)
+                {
+                    if (_loadedAssemblies.Contains(data.OriginAssembly))
+                    {
+                        Register(data.Component, true, true);
+                        changedContractTypes.Add(data.Definition.ContractType);
+                    }
+                }
         }
 
         RaiseExportCollectionChanged(changedContractTypes.ToArray());
     }
+    private void RemoveLocation(IExportData item)
+    {
+        var location = item.Definition.Location;
+        if (_exports.TryGetValue(location, out var data))
+            if (data == item)
+            {
+                if (data.OverrideBy != null)
+                    _exports[location] = data.OverrideBy;
+                else
+                    _exports.Remove(location);
+            }
+            else
+            {
+                for (; data.OverrideBy != null; data = data.OverrideBy)
+                    if (data.OverrideBy == item)
+                    {
+                        data.OverrideBy = data.OverrideBy.OverrideBy;
+                        break;
+                    }
+            }
+    }
 
-    public void Register<T>(ExportComponent<T> component)
+    public void Register<T>(ExportComponent<T> component) => Register((ExportComponent)component);
+    private void Register(ExportComponent component, bool skipExisting = false, bool skipEvent = false)
     {
         if (component == null)
             throw new ArgumentNullException(nameof(component));
@@ -451,13 +514,19 @@ public class ExportComponentManager
         {
             var data = new RegisteredExportData(component);
             if (_exports.ContainsKey(component.Location))
+            {
+                if (skipExisting)
+                    return;
+
                 throw new Exception(string.Format("Component with the same url ({0}) is already registered.", component.Location));
+            }
 
             _exports.Add(component.Location, data);
             _exportTree.Add(component.ContractType, component.ContractName ?? string.Empty, data);
         }
 
-        RaiseExportCollectionChanged(new[] { component.ContractType });
+        if (skipEvent)
+            RaiseExportCollectionChanged(new[] { component.ContractType });
     }
     public bool Unregister(Uri location)
     {
@@ -482,7 +551,7 @@ public class ExportComponentManager
                         }
                 }
 
-                _exports.Remove(location);
+                RemoveLocation(data);
                 contractType = data.Definition.ContractType;
             }
         }
@@ -495,7 +564,8 @@ public class ExportComponentManager
 
         return false;
     }
-    public bool Unregister(ExportComponent component)
+    public bool Unregister(ExportComponent component) => UnregisterCore(component, false);
+    public bool UnregisterCore(ExportComponent component, bool force)
     {
         if (component == null)
             throw new ArgumentNullException(nameof(component));
@@ -506,9 +576,9 @@ public class ExportComponentManager
             if (collection != null)
             {
                 for (var i = collection.Count - 1; i >= 0; i--)
-                    if (collection[i].IsRegistered && collection[i].Component == component)
+                    if (collection[i].Component == component && (force || collection[i].IsRegistered))
                     {
-                        _exports.Remove(collection[i].Definition.Location);
+                        RemoveLocation(collection[i]);
                         collection.RemoveAt(i);
                         return true;
                     }
@@ -736,6 +806,8 @@ public class ExportComponentManager
         ExportComponent Component { get; }
         Assembly OriginAssembly { get; }
         bool IsRegistered { get; }
+
+        IExportData OverrideBy { get; set; }
     }
     private class ExportData : IExportData
     {
@@ -758,6 +830,7 @@ public class ExportComponentManager
         }
         public Assembly OriginAssembly => Definition.ValueTypeAssembly;
         public bool IsRegistered => false;
+        public IExportData OverrideBy { get; set; }
 
         public ExportData(ExportComponentDefinition definition)
         {
@@ -770,6 +843,7 @@ public class ExportComponentManager
         public ExportComponent Component { get; }
         public Assembly OriginAssembly => Component.OriginAssembly;
         public bool IsRegistered => true;
+        public IExportData OverrideBy { get; set; }
 
         public RegisteredExportData(ExportComponent component)
         {
