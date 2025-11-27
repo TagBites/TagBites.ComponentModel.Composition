@@ -5,7 +5,6 @@ using System.Reflection;
 #if NETCOREAPP
 using System.Runtime.Loader;
 #endif
-using TagBites.Collections;
 
 namespace TagBites.ComponentModel.Composition;
 
@@ -29,7 +28,7 @@ public class ExportComponentManager
     private readonly HashSet<Assembly> _loadedAssemblies = [];
     private readonly List<(Assembly Assembly, List<IExportData> Removed)> _removedExports = [];
     private readonly Dictionary<Uri, IExportData> _exports = new();
-    private readonly MultiDoubleDictionary<Type, string, List<IExportData>, IExportData> _exportTree = [];
+    private readonly Dictionary<(Type, string), List<IExportData>> _exportTree = [];
 
     private Func<string, Type> _typeResolver = Type.GetType;
     private Func<string, Type, object> _deserializeFromFile;
@@ -38,13 +37,6 @@ public class ExportComponentManager
     private readonly HashSet<string> _assemblyWithoutCache = [];
 
     public string AssemblyCacheDirectory { get; private set; }
-
-    #endregion
-
-    #region Constructor
-
-    public ExportComponentManager()
-    { }
 
     #endregion
 
@@ -166,18 +158,21 @@ public class ExportComponentManager
     }
     public IEnumerable<ExportComponent> GetExports(string contractName, Type contractType)
     {
-        var items = new List<ExportComponent>();
-
         lock (_locker)
         {
-            var exports = _exportTree.TryGetValueDefault(contractType, contractName ?? string.Empty);
+            if (!_exportTree.TryGetValue((contractType, contractName ?? string.Empty), out var exports))
+                return [];
 
-            if (exports != null)
-                foreach (var export in exports)
-                    items.Add(export.Component);
+            var items = new ExportComponent[exports.Count];
+
+            for (var i = 0; i < exports.Count; i++)
+            {
+                var export = exports[i];
+                items[i] = export.Component;
+            }
+
+            return items;
         }
-
-        return items;
     }
 
     public IEnumerable<T> GetManyExportInstances<T>(string[] contractNames)
@@ -211,27 +206,42 @@ public class ExportComponentManager
         if (contractNames == null || contractNames.Length == 0)
             return Array.Empty<ExportComponent>();
 
-        var items = new List<ExportComponent>();
-        var names = new HashSet<string>();
+        List<ExportComponent> items = null;
 
         lock (_locker)
         {
-            // ReSharper disable once ForCanBeConvertedToForeach
             for (var i = 0; i < contractNames.Length; i++)
             {
                 var name = contractNames[i] ?? string.Empty;
-                if (names.Add(name))
-                {
-                    var exports = _exportTree.TryGetValueDefault(contractType, name);
 
-                    if (exports != null)
-                        foreach (var export in exports)
-                            items.Add(export.Component);
+                // Check for duplicate
+                var duplicate = false;
+                for (var j = 0; j < i; j++)
+                {
+                    if (name == (contractNames[j] ?? string.Empty))
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+
+                // Add
+                if (!duplicate)
+                {
+                    if (_exportTree.TryGetValue((contractType, name), out var exports))
+                    {
+                        items ??= new List<ExportComponent>(exports.Count);
+
+                        // ReSharper disable once ForCanBeConvertedToForeach
+                        // ReSharper disable once LoopCanBeConvertedToQuery
+                        for (var j = 0; j < exports.Count; j++)
+                            items.Add(exports[j].Component);
+                    }
                 }
             }
         }
 
-        return items;
+        return items ?? [];
     }
 
     public IList<ExportComponent> GetExports(Assembly assembly)
@@ -240,13 +250,17 @@ public class ExportComponentManager
 
         lock (_locker)
         {
+            // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
             foreach (var exports in _exportTree.Values)
+            {
+                // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
                 foreach (var export in exports)
                 {
                     var component = export.Component;
                     if (component.OriginAssembly == assembly)
                         items.Add(component);
                 }
+            }
         }
 
         return items;
@@ -257,10 +271,14 @@ public class ExportComponentManager
 
         lock (_locker)
         {
+            // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
             foreach (var exports in _exportTree.Values)
+            {
+                // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
                 foreach (var export in exports)
-                    if (export.Definition.ValueType.GetTypeInfo().Assembly == assembly)
+                    if (export.Definition.ValueType.Assembly == assembly)
                         items.Add(export.Definition);
+            }
         }
 
         return items;
@@ -278,38 +296,9 @@ public class ExportComponentManager
         }
     }
 
-    //public void LoadDirectory(string directory, bool compileScripts = true)
-    //{
-    //    lock (m_locker)
-    //    {
-    //        // Load Assemblies
-    //        foreach (var item in Directory.GetFiles("*.dll"))
-    //            try
-    //            {
-    //                var assembly = Assembly.LoadFile(item);
-    //                LoadAssembly(assembly);
-    //            }
-    //            catch { }
-
-    //        // Load and compile files
-    //        if (compileScripts)
-    //        {
-    //            foreach (var item in Directory.GetFiles("*.cs"))
-    //                try
-    //                {
-    //                    var source = File.ReadAllText(item);
-    //                    var dynamicAssembly = DynamicAssemblyCompiler.Compile(new[] { source });
-
-    //                    LoadAssembly(dynamicAssembly.Assembly);
-    //                }
-    //                catch { }
-    //        }
-    //    }
-    //}
-
     public void LoadAssembly(Type typeInRequestedAssembly)
     {
-        LoadAssembly(typeInRequestedAssembly.GetTypeInfo().Assembly);
+        LoadAssembly(typeInRequestedAssembly.Assembly);
     }
     public void LoadAssembly(Assembly assembly)
     {
@@ -375,13 +364,12 @@ public class ExportComponentManager
                         if (!valueType.IsInterface && !valueType.IsAbstract)
                             foreach (var exportInfo in valueType.GetCustomAttributes<ExportAttribute>(false))
                             {
-                                var vt = valueType;
-                                var contractType = exportInfo.ContractType ?? vt;
+                                var contractType = exportInfo.ContractType ?? valueType;
 
-                                if (!contractType.GetTypeInfo().IsAssignableFrom(vt))
+                                if (!contractType.IsAssignableFrom(valueType))
                                     continue;
 
-                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, vt);
+                                var definition = new ExportComponentDefinition(exportInfo.ContractName, contractType, valueType);
                                 items.Add(definition);
                             }
                 }
@@ -420,7 +408,7 @@ public class ExportComponentManager
                             _exports.Add(definition.Location, data);
                         }
 
-                        _exportTree.Add(definition.ContractType, definition.ContractName ?? string.Empty, data);
+                        AddCore(definition.ContractType, definition.ContractName, data);
 
                         changedContractTypes.Add(definition.ContractType);
                     }
@@ -523,7 +511,7 @@ public class ExportComponentManager
             }
 
             _exports.Add(component.Location, data);
-            _exportTree.Add(component.ContractType, component.ContractName ?? string.Empty, data);
+            AddCore(component.ContractType, component.ContractName, data);
         }
 
         if (skipEvent)
@@ -541,8 +529,9 @@ public class ExportComponentManager
             _exports.TryGetValue(location, out var data);
             if (data != null)
             {
-                var collection = _exportTree.TryGetValueDefault(data.Definition.ContractType, data.Definition.ContractName ?? string.Empty);
-                if (collection != null)
+                var key = (data.Definition.ContractType, data.Definition.ContractName ?? string.Empty);
+
+                if (_exportTree.TryGetValue(key, out var collection))
                 {
                     for (var i = collection.Count - 1; i >= 0; i--)
                         if (collection[i] == data)
@@ -550,6 +539,9 @@ public class ExportComponentManager
                             collection.RemoveAt(i);
                             break;
                         }
+
+                    if (collection.Count == 0)
+                        _exportTree.Remove(key);
                 }
 
                 RemoveLocation(data);
@@ -573,14 +565,18 @@ public class ExportComponentManager
 
         lock (_locker)
         {
-            var collection = _exportTree.TryGetValueDefault(component.ContractType, component.ContractName ?? string.Empty);
-            if (collection != null)
+            var key = (component.ContractType, component.ContractName ?? string.Empty);
+            if (_exportTree.TryGetValue(key, out var collection))
             {
                 for (var i = collection.Count - 1; i >= 0; i--)
                     if (collection[i].Component == component && (force || collection[i].IsRegistered))
                     {
                         RemoveLocation(collection[i]);
                         collection.RemoveAt(i);
+
+                        if (collection.Count == 0)
+                            _exportTree.Remove(key);
+
                         return true;
                     }
             }
@@ -623,6 +619,19 @@ public class ExportComponentManager
     public void UseCustomTypeResolver(Func<string, Type> typeResolver)
     {
         _typeResolver = typeResolver ?? throw new ArgumentNullException(nameof(typeResolver));
+    }
+
+    private void AddCore(Type contractType, string contractName, IExportData data)
+    {
+        var key = (contractType, contractName ?? string.Empty);
+
+        if (!_exportTree.TryGetValue(key, out var collection))
+        {
+            collection = [];
+            _exportTree.Add(key, collection);
+        }
+
+        collection.Add(data);
     }
 
     #endregion
@@ -804,24 +813,11 @@ public class ExportComponentManager
 
     #region Cache classes
 
-    private class AssemblyCacheModel
-    {
-        public List<AssemblyExportModel> Exports { get; set; }
-    }
     private class AssemblyExportModel
     {
         public string ContractName { get; set; }
         public string ValueType { get; set; }
         public string Location { get; set; }
-    }
-
-    #endregion
-
-    #region Helpers
-
-    private static bool HasDefaultConstructor(Type type)
-    {
-        return type.GetTypeInfo().DeclaredConstructors.Any(x => x.IsPublic && x.GetParameters().Length == 0);
     }
 
     #endregion

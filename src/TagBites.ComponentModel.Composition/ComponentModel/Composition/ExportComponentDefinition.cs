@@ -1,4 +1,3 @@
-using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -145,6 +144,6 @@ public class ExportComponentDefinition
         var guid = GetTypeGuid(type);
         return guid != Guid.Empty
             ? guid.ToString("D").ToUpper()
-            : $"{type.FullName},{type.GetTypeInfo().Assembly.GetName().Name}";
+            : $"{type.FullName},{type.Assembly.GetName().Name}";
     }
 }
