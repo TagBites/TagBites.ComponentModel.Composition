@@ -26,19 +26,18 @@ public class ExportComponentManager
     #region Members
 
     private readonly object _locker = new();
-    private readonly HashSet<Assembly> _loadedAssemblies = new();
-    private readonly List<(Assembly Assembly, List<IExportData> Removed)> _removedExports = new();
+    private readonly HashSet<Assembly> _loadedAssemblies = [];
+    private readonly List<(Assembly Assembly, List<IExportData> Removed)> _removedExports = [];
     private readonly Dictionary<Uri, IExportData> _exports = new();
-    private readonly MultiDoubleDictionary<Type, string, List<IExportData>, IExportData> _exportTree = new();
+    private readonly MultiDoubleDictionary<Type, string, List<IExportData>, IExportData> _exportTree = [];
 
-    private readonly Func<string, Type, object> _deserializeFromFile;
-    private readonly Action<string, object> _serializeToFile;
+    private Func<string, Type> _typeResolver = Type.GetType;
+    private Func<string, Type, object> _deserializeFromFile;
+    private Action<string, object> _serializeToFile;
 
-    private bool _loadedAssemblyOutsideOfCache;
-    private bool _lastAssemblyCacheInfoNotFound;
-    private CacheInfoModel _lastAssemblyCacheInfo;
+    private readonly HashSet<string> _assemblyWithoutCache = [];
 
-    public string AssemblyCacheDirectory { get; }
+    public string AssemblyCacheDirectory { get; private set; }
 
     #endregion
 
@@ -46,12 +45,6 @@ public class ExportComponentManager
 
     public ExportComponentManager()
     { }
-    public ExportComponentManager(string assemblyCacheDirectory, Func<string, Type, object> deserializeFromFile, Action<string, object> serializeToFile)
-    {
-        AssemblyCacheDirectory = assemblyCacheDirectory;
-        _deserializeFromFile = deserializeFromFile;
-        _serializeToFile = serializeToFile;
-    }
 
     #endregion
 
@@ -331,42 +324,48 @@ public class ExportComponentManager
             try
             {
                 var items = new List<ExportComponentDefinition>();
-                var loadDirectly = true;
 
                 // Load form cache
-                var cache = GetAssemblyCacheModel(assembly);
-                if (cache != null)
+                var cache = TryGetAssemblyCacheModel(assembly);
+                var loadFromCache = cache != null;
+
+                if (loadFromCache)
                 {
-                    loadDirectly = false;
-                    var map = new Dictionary<string, Type>();
                     try
                     {
-                        foreach (var export in cache.Exports)
+                        foreach (var item in cache)
                         {
-                            if (!map.TryGetValue(export.ContractType, out var contractType))
+                            var contractType = _typeResolver(item.Key);
+                            if (contractType == null)
                             {
-                                contractType = Type.GetType(export.ContractType);
-                                if (contractType == null)
-                                {
-                                    loadDirectly = true;
-                                    break;
-                                }
-
-                                map.Add(export.ContractType, contractType);
+                                loadFromCache = false;
+                                break;
                             }
 
-                            var definition = new ExportComponentDefinition(export.ContractName ?? string.Empty, contractType, assembly, export.ValueType, export.Location);
-                            items.Add(definition);
+                            // ReSharper disable once ForCanBeConvertedToForeach
+                            // ReSharper disable once LoopCanBeConvertedToQuery
+                            for (var i = 0; i < item.Value.Count; i++)
+                            {
+                                var export = item.Value[i];
+                                var definition = new ExportComponentDefinition(
+                                    export.ContractName ?? string.Empty,
+                                    contractType,
+                                    assembly,
+                                    export.ValueType,
+                                    export.Location);
+
+                                items.Add(definition);
+                            }
                         }
                     }
                     catch
                     {
-                        loadDirectly = true;
+                        loadFromCache = false;
                     }
                 }
 
                 // Load from assembly
-                if (loadDirectly)
+                if (!loadFromCache)
                 {
                     items.Clear();
 
@@ -429,8 +428,8 @@ public class ExportComponentManager
                     if (removed != null)
                         _removedExports.Add((assembly, removed));
 
-                    if (loadDirectly)
-                        _loadedAssemblyOutsideOfCache = true;
+                    if (!loadFromCache && !string.IsNullOrEmpty(AssemblyCacheDirectory))
+                        _assemblyWithoutCache.Add(assembly.GetName().Name);
                 }
             }
             catch
@@ -450,6 +449,8 @@ public class ExportComponentManager
         {
             if (!_loadedAssemblies.Remove(assembly))
                 return;
+
+            _assemblyWithoutCache.Remove(assembly.GetName().Name);
 
             foreach (var collection in _exportTree.Values)
             {
@@ -526,7 +527,7 @@ public class ExportComponentManager
         }
 
         if (skipEvent)
-            RaiseExportCollectionChanged(new[] { component.ContractType });
+            RaiseExportCollectionChanged([component.ContractType]);
     }
     public bool Unregister(Uri location)
     {
@@ -558,7 +559,7 @@ public class ExportComponentManager
 
         if (contractType != null)
         {
-            RaiseExportCollectionChanged(new[] { contractType });
+            RaiseExportCollectionChanged([contractType]);
             return true;
         }
 
@@ -619,79 +620,119 @@ public class ExportComponentManager
         }
     }
 
+    public void UseCustomTypeResolver(Func<string, Type> typeResolver)
+    {
+        _typeResolver = typeResolver ?? throw new ArgumentNullException(nameof(typeResolver));
+    }
+
     #endregion
 
     #region Cache
 
-    private string GetCacheFileName()
+    public void UseCache(string assemblyCacheDirectory, Func<string, Type, object> deserializeFromFile, Action<string, object> serializeToFile)
     {
-        var directory = AssemblyCacheDirectory;
-        if (string.IsNullOrEmpty(directory))
-            return null;
-
-        return Path.Combine(directory, "cache-info.json");
+        AssemblyCacheDirectory = assemblyCacheDirectory ?? throw new ArgumentNullException(nameof(assemblyCacheDirectory));
+        _deserializeFromFile = deserializeFromFile ?? throw new ArgumentNullException(nameof(deserializeFromFile));
+        _serializeToFile = serializeToFile ?? throw new ArgumentNullException(nameof(serializeToFile));
     }
+    public void PrepareCache()
+    {
+        if (string.IsNullOrEmpty(AssemblyCacheDirectory))
+            throw new InvalidOperationException("AssemblyCacheDirectory is not set.");
+
+        Dictionary<Assembly, List<ExportComponentDefinition>> assemblies;
+
+        // Prepare data
+        lock (_locker)
+        {
+            if (_assemblyWithoutCache.Count == 0)
+                return;
+
+            // Copy components
+            var values = _exportTree.Values
+                .SelectMany(x => x)
+                .Select(x => x.Definition)
+                .ToList();
+            var loadedAssemblies = _loadedAssemblies.ToList();
+
+            // Create Cache
+            assemblies = values
+                .GroupBy(x => x.ValueTypeAssembly)
+                .Where(x => _assemblyWithoutCache.Contains(x.Key.GetName().Name))
+                .ToDictionary(x => x.Key, x => x.ToList());
+
+            foreach (var loadedAssembly in loadedAssemblies)
+                if (_assemblyWithoutCache.Contains(loadedAssembly.GetName().Name) && !assemblies.ContainsKey(loadedAssembly))
+                    assemblies.Add(loadedAssembly, []);
+
+            _assemblyWithoutCache.Clear();
+        }
+
+        // Serialize to files
+        var directoryPrepared = false;
+
+        foreach (var assemblyGroup in assemblies)
+        {
+            var assembly = assemblyGroup.Key;
+            if (assembly.IsDynamic)
+                continue;
+
+            var exports = assemblyGroup.Value;
+            var fileName = GetAssemblyCacheFileName(assembly);
+
+            if (!File.Exists(fileName))
+            {
+                // Create model
+                var model = exports.GroupBy(x => x.ContractType)
+                    .ToDictionary(
+                        x => x.Key.AssemblyQualifiedName?.Replace(", Culture=neutral, PublicKeyToken=null", string.Empty),
+                        x =>
+                        {
+                            return x.Select(data => new AssemblyExportModel
+                            {
+                                ContractName = data.ContractName,
+                                ValueType = data.ValueTypeFullName,
+                                Location = data.Location.ToString()
+                            }).ToList();
+                        });
+
+                // Create cache directory
+                if (!directoryPrepared)
+                {
+                    Directory.CreateDirectory(AssemblyCacheDirectory);
+                    directoryPrepared = true;
+                }
+
+                // Save
+                _serializeToFile(fileName, model);
+            }
+        }
+    }
+
     private string GetAssemblyCacheFileName(Assembly assembly)
     {
-        var directory = AssemblyCacheDirectory;
-        if (string.IsNullOrEmpty(directory))
+        var name = assembly.GetName();
+        var moduleId = assembly.ManifestModule.ModuleVersionId.ToString("N");
+
+        var directory = AssemblyCacheDirectory ?? throw new InvalidOperationException();
+        return Path.Combine(directory, $"{name.Name}-{name.Version}-{moduleId}.json");
+    }
+    private Dictionary<string, List<AssemblyExportModel>> TryGetAssemblyCacheModel(Assembly assembly)
+    {
+        if (assembly.IsDynamic)
             return null;
 
-        var name = assembly.GetName();
-        return Path.Combine(directory, $"{name.Name} v. {name.Version}.json");
-    }
+        if (string.IsNullOrEmpty(AssemblyCacheDirectory))
+            return null;
 
-    private CacheInfoModel GetCacheModel(bool forceLoaded)
-    {
-        if (!forceLoaded)
-        {
-            if (_lastAssemblyCacheInfoNotFound)
-                return null;
-
-            if (_lastAssemblyCacheInfo != null)
-                return _lastAssemblyCacheInfo;
-        }
-
-        _lastAssemblyCacheInfo = null;
-
-        var fullName = GetCacheFileName();
-        if (File.Exists(fullName))
-        {
-            try
-            {
-                lock (_locker)
-                    _lastAssemblyCacheInfo = _deserializeFromFile(fullName, typeof(CacheInfoModel)) as CacheInfoModel;// ModelManager<CacheInfoModel>.FromFile(fullName);                      
-            }
-            catch
-            {
-                // Ignored
-            }
-        }
-
-        _lastAssemblyCacheInfoNotFound = _lastAssemblyCacheInfo == null;
-        return _lastAssemblyCacheInfo;
-    }
-    private AssemblyCacheModel GetAssemblyCacheModel(Assembly assembly)
-    {
         try
         {
-            if (assembly.IsDynamic)
-                return null;
-
-            var cacheInfo = GetCacheModel(false);
-            if (cacheInfo == null)
-                return null;
-
             var file = GetAssemblyCacheFileName(assembly);
             if (!File.Exists(file))
                 return null;
 
-            var current = CreateAssemblyCacheInfo(assembly);
-            var cached = cacheInfo.Assemblies.FirstOrDefault(x => x.Equals(current));
-            if (cached == null)
-                return null;
-
-            return _deserializeFromFile(file, typeof(AssemblyCacheModel)) as AssemblyCacheModel; // ModelManager<AssemblyCacheModel>.FromFile(fullName);
+            var cache = _deserializeFromFile(file, typeof(Dictionary<string, List<AssemblyExportModel>>)) as Dictionary<string, List<AssemblyExportModel>>;
+            return cache;
         }
         catch
         {
@@ -699,101 +740,6 @@ public class ExportComponentManager
         }
 
         return null;
-    }
-
-    public void PrepareCache()
-    {
-        string cacheInfoFileName;
-        CacheInfoModel oldCacheInfo;
-        List<ExportComponentDefinition> values;
-        List<Assembly> loadedAssemblies;
-
-        lock (_locker)
-        {
-            if (!_loadedAssemblyOutsideOfCache)
-                return;
-            _loadedAssemblyOutsideOfCache = false;
-
-            cacheInfoFileName = GetCacheFileName();
-            if (string.IsNullOrEmpty(cacheInfoFileName))
-                throw new InvalidOperationException("AssemblyCacheDirectory is not set.");
-
-            oldCacheInfo = GetCacheModel(true);
-
-            // Create cache directory
-            var directory = Path.GetDirectoryName(cacheInfoFileName);
-            if (!string.IsNullOrEmpty(directory))
-                Directory.CreateDirectory(directory);
-
-            // Copy components
-            values = _exportTree.Values.SelectMany(x => x).Select(x => x.Definition).ToList();
-            loadedAssemblies = _loadedAssemblies.ToList();
-        }
-
-        // Create Cache
-        var assemblies = values.GroupBy(x => x.ValueTypeAssembly).ToDictionary(x => x.Key, x => x.ToList());
-        foreach (var loadedAssembly in loadedAssemblies)
-            if (!assemblies.ContainsKey(loadedAssembly))
-                assemblies.Add(loadedAssembly, new List<ExportComponentDefinition>());
-
-        //{
-        //    // Remove duplicated assemblies (the same name and version)
-        //    var duplicates = new Dictionary<string, Assembly>();
-
-        //    foreach (var assembly in assemblies.Keys.ToList())
-        //        if (!duplicates.ContainsKey(assembly.FullName))
-        //            duplicates.Add(assembly.FullName, assembly);
-        //        else
-        //        {
-        //            assemblies.Remove(assembly);
-        //            assemblies.Remove(duplicates[assembly.FullName]);
-        //        }
-        //}
-
-        var cacheInfo = new CacheInfoModel();
-
-        foreach (var assembly in assemblies)
-            if (!assembly.Key.IsDynamic)
-            {
-                var current = CreateAssemblyCacheInfo(assembly.Key);
-                var cached = oldCacheInfo?.Assemblies.FirstOrDefault(x => x.Equals(current));
-                var fileName = GetAssemblyCacheFileName(assembly.Key);
-
-                if (cached == null || !File.Exists(fileName))
-                {
-                    var assemblyModel = new AssemblyCacheModel();
-                    foreach (var data in assembly.Value)
-                    {
-                        var exportModel = new AssemblyExportModel()
-                        {
-                            ContractName = data.ContractName,
-                            ContractType = data.ContractType.AssemblyQualifiedName,
-                            ValueType = data.ValueTypeFullName,
-                            Location = data.Location.ToString()
-                        };
-                        assemblyModel.Exports.Add(exportModel);
-                    }
-
-                    _serializeToFile(fileName, assemblyModel); // ModelManager.ToFile(assemblyModel, fileName);
-                }
-
-                cacheInfo.Assemblies.Add(current);
-            }
-
-        _serializeToFile(cacheInfoFileName, cacheInfo); // ModelManager.ToFile(cacheInfo, cacheInfoFileName);
-    }
-    private AssemblyCacheInfoModel CreateAssemblyCacheInfo(Assembly assembly)
-    {
-        var fileInfo = new FileInfo(assembly.Location);
-        var name = assembly.GetName();
-
-        return new AssemblyCacheInfoModel
-        {
-            Name = name.Name,
-            Version = name.Version.ToString(),
-            ModifyTime = fileInfo.LastWriteTimeUtc,
-            Size = fileInfo.Length
-        };
     }
 
     #endregion
@@ -858,51 +804,13 @@ public class ExportComponentManager
 
     #region Cache classes
 
-    private class CacheInfoModel
-    {
-        public IList<AssemblyCacheInfoModel> Assemblies { get; } = new List<AssemblyCacheInfoModel>();
-    }
-    private sealed class AssemblyCacheInfoModel
-    {
-        public string Name { get; set; }
-        public string Version { get; set; }
-        public long Size { get; set; }
-        public DateTime ModifyTime { get; set; }
-
-
-        private bool Equals(AssemblyCacheInfoModel other)
-        {
-            return string.Equals(Name, other.Name)
-                   && string.Equals(Version, other.Version)
-                   && Size == other.Size
-                   && ModifyTime.Equals(other.ModifyTime);
-        }
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj))
-                return false;
-            if (ReferenceEquals(this, obj))
-                return true;
-            return obj is AssemblyCacheInfoModel other && Equals(other);
-        }
-        public override int GetHashCode()
-        {
-            // ReSharper disable once NonReadonlyMemberInGetHashCode
-            return Name?.GetHashCode() ?? 0;
-        }
-        public override string ToString()
-        {
-            return $"{Name} v. {Version}";
-        }
-    }
     private class AssemblyCacheModel
     {
-        public IList<AssemblyExportModel> Exports { get; } = new List<AssemblyExportModel>();
+        public List<AssemblyExportModel> Exports { get; set; }
     }
     private class AssemblyExportModel
     {
         public string ContractName { get; set; }
-        public string ContractType { get; set; }
         public string ValueType { get; set; }
         public string Location { get; set; }
     }
