@@ -514,7 +514,7 @@ public class ExportComponentManager
             AddCore(component.ContractType, component.ContractName, data);
         }
 
-        if (skipEvent)
+        if (!skipEvent)
             RaiseExportCollectionChanged([component.ContractType]);
     }
     public bool Unregister(Uri location)
@@ -557,12 +557,19 @@ public class ExportComponentManager
 
         return false;
     }
-    public bool Unregister(ExportComponent component) => UnregisterCore(component, false);
-    public bool UnregisterCore(ExportComponent component, bool force)
+    public bool Unregister(ExportComponent component)
     {
         if (component == null)
             throw new ArgumentNullException(nameof(component));
 
+        if (!UnregisterCore(component, false))
+            return false;
+
+        RaiseExportCollectionChanged([component.ContractType]);
+        return true;
+    }
+    private bool UnregisterCore(ExportComponent component, bool force)
+    {
         lock (_locker)
         {
             var key = (component.ContractType, component.ContractName ?? string.Empty);
