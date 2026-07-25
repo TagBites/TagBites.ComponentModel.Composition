@@ -577,8 +577,12 @@ public class ExportComponentManager
         RaiseExportCollectionChanged([component.ContractType]);
         return true;
     }
-    private bool UnregisterCore(ExportComponent component, bool force)
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public bool UnregisterCore(ExportComponent component, bool force)
     {
+        if (component == null)
+            throw new ArgumentNullException(nameof(component));
+
         lock (_locker)
         {
             var key = (component.ContractType, component.ContractName ?? string.Empty);
