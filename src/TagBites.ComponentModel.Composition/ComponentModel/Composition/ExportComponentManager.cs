@@ -497,7 +497,7 @@ public class ExportComponentManager
         if (component == null)
             throw new ArgumentNullException(nameof(component));
         if (component.Location == null)
-            throw new ArgumentNullException(nameof(component) + "." + nameof(component.Location));
+            throw new ArgumentException("Component location cannot be null.", nameof(component));
 
         lock (_locker)
         {
@@ -507,7 +507,7 @@ public class ExportComponentManager
                 if (skipExisting)
                     return;
 
-                throw new Exception(string.Format("Component with the same url ({0}) is already registered.", component.Location));
+                throw new InvalidOperationException($"Component with the same uri ({component.Location}) is already registered.");
             }
 
             _exports.Add(component.Location, data);
