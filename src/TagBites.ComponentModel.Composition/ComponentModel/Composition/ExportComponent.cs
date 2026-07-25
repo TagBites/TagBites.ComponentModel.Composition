@@ -111,15 +111,21 @@ public sealed class ExportComponent<T> : ExportComponent
 
     public ExportComponent(ExportComponentDefinition definition)
         : base(definition)
-    { }
+    {
+        ThrowIfContractTypeMismatch(definition.ContractType);
+    }
     public ExportComponent(string contractName, Type contractType, Type valueType, Uri location = null)
         : base(contractName, contractType, valueType, location)
-    { }
+    {
+        ThrowIfContractTypeMismatch(contractType);
+    }
     public ExportComponent(string contractName, Type contractType, Type valueType, Uri location, Func<T> instanceProvider, Assembly originAssembly)
         : base(contractName, contractType, valueType, location, () => instanceProvider(), originAssembly)
     {
         if (instanceProvider == null)
             throw new ArgumentNullException(nameof(instanceProvider));
+
+        ThrowIfContractTypeMismatch(contractType);
     }
 
 
@@ -130,5 +136,11 @@ public sealed class ExportComponent<T> : ExportComponent
     public new T CreateInstance()
     {
         return (T)base.CreateInstance();
+    }
+
+    private static void ThrowIfContractTypeMismatch(Type contractType)
+    {
+        if (contractType != typeof(T))
+            throw new ArgumentException($"Contract type must be '{typeof(T)}', not '{contractType}'.", nameof(contractType));
     }
 }

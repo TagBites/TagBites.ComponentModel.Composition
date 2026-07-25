@@ -51,6 +51,8 @@ public class ExportComponentDefinition
             throw new ArgumentNullException(nameof(contractType));
         if (valueType == null)
             throw new ArgumentNullException(nameof(valueType));
+        if (!contractType.IsAssignableFrom(valueType))
+            throw new ArgumentException($"Value type '{valueType}' is not assignable to contract type '{contractType}'.", nameof(valueType));
 
         ContractName = contractName;
         ContractType = contractType;
@@ -69,6 +71,8 @@ public class ExportComponentDefinition
             throw new ArgumentNullException(nameof(valueTypeAssembly));
         if (string.IsNullOrEmpty(valueTypeFullName))
             throw new ArgumentException("Value cannot be null or empty.", nameof(valueTypeFullName));
+
+        // Assignability stays unchecked - the value type is resolved on first use, which is the point of the cache
 
         ContractName = contractName;
         ContractType = contractType;
