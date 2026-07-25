@@ -6,7 +6,7 @@ namespace TagBites.ComponentModel.Composition.Tests;
 
 public class AssemblyCacheTests : IDisposable
 {
-    private readonly string _cacheDirectory = Path.Combine(Path.GetTempPath(), "TagBites.ComponentModel.Composition.Tests", Guid.NewGuid().ToString("N"));
+    private readonly string _cacheDirectory = Path.Combine(AppContext.BaseDirectory, "cache", Guid.NewGuid().ToString("N").Substring(0, 8));
 
 
     [Fact]
