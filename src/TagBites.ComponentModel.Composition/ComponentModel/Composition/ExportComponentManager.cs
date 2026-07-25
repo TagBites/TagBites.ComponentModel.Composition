@@ -461,16 +461,19 @@ public class ExportComponentManager
                 }
             }
 
-            var removed = _removedExports.FirstOrDefault(x => x.Assembly == assembly).Removed;
-            if (removed != null)
+            var removedIndex = _removedExports.FindIndex(x => x.Assembly == assembly);
+            if (removedIndex >= 0)
+            {
+                var removed = _removedExports[removedIndex].Removed;
+                _removedExports.RemoveAt(removedIndex);
+
                 foreach (var data in removed)
-                {
                     if (_loadedAssemblies.Contains(data.OriginAssembly))
                     {
                         Register(data.Component, true, true);
                         changedContractTypes.Add(data.Definition.ContractType);
                     }
-                }
+            }
         }
 
         RaiseExportCollectionChanged(changedContractTypes.ToArray());
