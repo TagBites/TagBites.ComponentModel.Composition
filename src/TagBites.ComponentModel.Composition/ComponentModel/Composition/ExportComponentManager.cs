@@ -7,8 +7,9 @@ using System.Text.RegularExpressions;
 namespace TagBites.ComponentModel.Composition;
 
 /// <summary>
-/// Thread safe.
+/// Container of exported components. Discovers types marked with <see cref="ExportAttribute"/> and creates their instances on demand.
 /// </summary>
+/// <remarks>All members are thread safe.</remarks>
 [PublicAPI]
 public class ExportComponentManager
 {
@@ -16,6 +17,9 @@ public class ExportComponentManager
 
     private readonly Dictionary<Type, EventHandler> _events = new();
 
+    /// <summary>
+    /// Occurs when exports are added or removed.
+    /// </summary>
     public event EventHandler<ExportCollectionChangedEventArgs> ExportCollectionChanged;
 
     #endregion
@@ -34,6 +38,9 @@ public class ExportComponentManager
 
     private readonly HashSet<string> _assemblyWithoutCache = [];
 
+    /// <summary>
+    /// Gets the directory with assembly cache files, or <c>null</c> when the cache is not used.
+    /// </summary>
     public string AssemblyCacheDirectory { get; private set; }
 
     #endregion
@@ -41,6 +48,12 @@ public class ExportComponentManager
 
     #region Get Exports
 
+    /// <summary>
+    /// Gets the shared instance of the export with the given location.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="location">Export URI.</param>
+    /// <returns>Shared instance, or the default value of <typeparamref name="T"/> when no such export exists.</returns>
     public T GetExportInstance<T>(Uri location)
     {
         var export = GetExport<T>(location);
@@ -48,6 +61,12 @@ public class ExportComponentManager
             ? export.Instance
             : default;
     }
+    /// <summary>
+    /// Creates a new instance of the export with the given location.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="location">Export URI.</param>
+    /// <returns>New instance, or the default value of <typeparamref name="T"/> when no such export exists.</returns>
     public T CreateExportInstance<T>(Uri location)
     {
         var export = GetExport<T>(location);
@@ -55,21 +74,34 @@ public class ExportComponentManager
             ? export.CreateInstance()
             : default;
     }
+    /// <summary>
+    /// Gets the export with the given location.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="location">Export URI.</param>
+    /// <returns>Export component, or <c>null</c> when no such export exists or its contract type differs.</returns>
     public ExportComponent<T> GetExport<T>(Uri location)
     {
         return GetExport(location) as ExportComponent<T>;
     }
 
+    /// <inheritdoc cref="GetExportInstance{T}"/>
     public object GetExportInstance(Uri location)
     {
         var export = GetExport(location);
         return export?.Instance;
     }
+    /// <inheritdoc cref="CreateExportInstance{T}"/>
     public object CreateExportInstance(Uri location)
     {
         var export = GetExport(location);
         return export?.CreateInstance();
     }
+    /// <summary>
+    /// Gets the export with the given location. Follows the override chain, so the last export registered for the location wins.
+    /// </summary>
+    /// <param name="location">Export URI.</param>
+    /// <returns>Export component, or <c>null</c> when no such export exists.</returns>
     public ExportComponent GetExport(Uri location)
     {
         if (location == null)
@@ -88,61 +120,101 @@ public class ExportComponentManager
         }
     }
 
+    /// <summary>
+    /// Gets the shared instances of all exports of the given contract.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <returns>Shared instances of exports without a contract name.</returns>
     public IEnumerable<T> GetExportInstances<T>()
     {
         return GetExportInstances<T>(null);
     }
+    /// <summary>
+    /// Gets the shared instances of all exports of the given contract.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="contractName">Contract name, or <c>null</c> for exports without a contract name.</param>
+    /// <returns>Shared instances.</returns>
     public IEnumerable<T> GetExportInstances<T>(string contractName)
     {
         foreach (var export in GetExports<T>(contractName))
             yield return export.Instance;
     }
+    /// <summary>
+    /// Creates a new instance of every export of the given contract.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <returns>New instances of exports without a contract name.</returns>
     public IEnumerable<T> CreateExportInstances<T>()
     {
         return CreateExportInstances<T>(null);
     }
+    /// <summary>
+    /// Creates a new instance of every export of the given contract.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="contractName">Contract name, or <c>null</c> for exports without a contract name.</param>
+    /// <returns>New instances.</returns>
     public IEnumerable<T> CreateExportInstances<T>(string contractName)
     {
         foreach (var export in GetExports<T>(contractName))
             yield return export.CreateInstance();
     }
+    /// <summary>
+    /// Gets all exports of the given contract.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <returns>Exports without a contract name.</returns>
     public IEnumerable<ExportComponent<T>> GetExports<T>()
     {
         foreach (var component in GetExports(null, typeof(T)))
             yield return (ExportComponent<T>)component;
     }
+    /// <summary>
+    /// Gets all exports of the given contract.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="contractName">Contract name, or <c>null</c> for exports without a contract name.</param>
+    /// <returns>Exports.</returns>
     public IEnumerable<ExportComponent<T>> GetExports<T>(string contractName)
     {
         foreach (var component in GetExports(contractName, typeof(T)))
             yield return (ExportComponent<T>)component;
     }
 
+    /// <inheritdoc cref="GetExportInstances{T}(string)"/>
     public IEnumerable<object> GetExportInstances(ContractDefinition contract)
     {
         return GetExportInstances(contract.ContractName, contract.ContractType);
     }
+    /// <inheritdoc cref="GetExportInstances{T}(string)"/>
     public IEnumerable<object> GetExportInstances(Type contractType)
     {
         return GetExportInstances(null, contractType);
     }
+    /// <inheritdoc cref="GetExportInstances{T}(string)"/>
     public IEnumerable<object> GetExportInstances(string contractName, Type contractType)
     {
         foreach (var export in GetExports(contractName, contractType))
             yield return export.Instance;
     }
+    /// <inheritdoc cref="CreateExportInstances{T}(string)"/>
     public IEnumerable<object> CreateExportInstances(ContractDefinition contract)
     {
         return CreateExportInstances(contract.ContractName, contract.ContractType);
     }
+    /// <inheritdoc cref="CreateExportInstances{T}(string)"/>
     public IEnumerable<object> CreateExportInstances(Type contractType)
     {
         return CreateExportInstances(null, contractType);
     }
+    /// <inheritdoc cref="CreateExportInstances{T}(string)"/>
     public IEnumerable<object> CreateExportInstances(string contractName, Type contractType)
     {
         foreach (var export in GetExports(contractName, contractType))
             yield return export.CreateInstance();
     }
+    /// <inheritdoc cref="GetExports{T}(string)"/>
     public IEnumerable<ExportComponent> GetExports(ContractDefinition contract)
     {
         if (contract == null)
@@ -150,10 +222,12 @@ public class ExportComponentManager
 
         return GetExports(contract.ContractName, contract.ContractType);
     }
+    /// <inheritdoc cref="GetExports{T}(string)"/>
     public IEnumerable<ExportComponent> GetExports(Type contractType)
     {
         return GetExports(null, contractType);
     }
+    /// <inheritdoc cref="GetExports{T}(string)"/>
     public IEnumerable<ExportComponent> GetExports(string contractName, Type contractType)
     {
         lock (_locker)
@@ -173,32 +247,53 @@ public class ExportComponentManager
         }
     }
 
+    /// <summary>
+    /// Gets the shared instances of all exports of the given contract names.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="contractNames">Contract names. A <c>null</c> item means exports without a contract name; duplicates are ignored.</param>
+    /// <returns>Shared instances.</returns>
     public IEnumerable<T> GetManyExportInstances<T>(string[] contractNames)
     {
         foreach (var export in GetManyExports<T>(contractNames))
             yield return export.Instance;
     }
+    /// <summary>
+    /// Creates a new instance of every export of the given contract names.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="contractNames">Contract names. A <c>null</c> item means exports without a contract name; duplicates are ignored.</param>
+    /// <returns>New instances.</returns>
     public IEnumerable<T> CreateManyExportInstances<T>(string[] contractNames)
     {
         foreach (var export in GetManyExports<T>(contractNames))
             yield return export.CreateInstance();
     }
+    /// <summary>
+    /// Gets all exports of the given contract names.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="contractNames">Contract names. A <c>null</c> item means exports without a contract name; duplicates are ignored.</param>
+    /// <returns>Exports.</returns>
     public IEnumerable<ExportComponent<T>> GetManyExports<T>(string[] contractNames)
     {
         foreach (var component in GetManyExports(contractNames, typeof(T)))
             yield return (ExportComponent<T>)component;
     }
 
+    /// <inheritdoc cref="CreateManyExportInstances{T}"/>
     public IEnumerable<object> CreateManyExportInstances(string[] contractNames, Type contractType)
     {
         foreach (var export in GetManyExports(contractNames, contractType))
             yield return export.CreateInstance();
     }
+    /// <inheritdoc cref="GetManyExportInstances{T}"/>
     public IEnumerable<object> GetManyExportInstances(string[] contractNames, Type contractType)
     {
         foreach (var export in GetManyExports(contractNames, contractType))
             yield return export.Instance;
     }
+    /// <inheritdoc cref="GetManyExports{T}"/>
     public IList<ExportComponent> GetManyExports(string[] contractNames, Type contractType)
     {
         if (contractNames == null || contractNames.Length == 0)
@@ -242,6 +337,11 @@ public class ExportComponentManager
         return items ?? [];
     }
 
+    /// <summary>
+    /// Gets all exports that come from the given assembly.
+    /// </summary>
+    /// <param name="assembly">Origin assembly.</param>
+    /// <returns>Exports.</returns>
     public IList<ExportComponent> GetExports(Assembly assembly)
     {
         var items = new List<ExportComponent>();
@@ -263,6 +363,12 @@ public class ExportComponentManager
 
         return items;
     }
+    /// <summary>
+    /// Gets the definitions of all exports whose value type comes from the given assembly.
+    /// </summary>
+    /// <param name="assembly">Value type assembly.</param>
+    /// <returns>Export definitions.</returns>
+    /// <remarks>Resolves the value type of every export, which loads types that the cache left unresolved.</remarks>
     public IList<ExportComponentDefinition> GetExportsDefinitions(Assembly assembly)
     {
         var items = new List<ExportComponentDefinition>();
@@ -294,6 +400,10 @@ public class ExportComponentManager
 
     #region Load/Unload Assembly, Register/Unregister Component
 
+    /// <summary>
+    /// Gets the assemblies loaded into the container.
+    /// </summary>
+    /// <returns>Loaded assemblies.</returns>
     public Assembly[] GetLoadedAssemblies()
     {
         lock (_locker)
@@ -302,10 +412,20 @@ public class ExportComponentManager
         }
     }
 
+    /// <inheritdoc cref="LoadAssembly(Assembly)"/>
+    /// <param name="typeInRequestedAssembly">Any type from the assembly to load.</param>
     public void LoadAssembly(Type typeInRequestedAssembly)
     {
         LoadAssembly(typeInRequestedAssembly.Assembly);
     }
+    /// <summary>
+    /// Loads all exports of the given assembly. Does nothing when the assembly is already loaded.
+    /// </summary>
+    /// <param name="assembly">Assembly to load.</param>
+    /// <remarks>
+    /// Reads the export definitions from the cache when a matching cache file exists, otherwise reflects over all types of the assembly.
+    /// Either all exports of the assembly become available, or none: a failure unloads the assembly and rethrows.
+    /// </remarks>
     public void LoadAssembly(Assembly assembly)
     {
         var changedContractTypes = new HashSet<Type>();
@@ -435,6 +555,10 @@ public class ExportComponentManager
 
         RaiseExportCollectionChanged(changedContractTypes.ToArray());
     }
+    /// <summary>
+    /// Removes all exports of the given assembly and restores the exports it replaced. Does nothing when the assembly is not loaded.
+    /// </summary>
+    /// <param name="assembly">Assembly to unload.</param>
     public void UnloadAssembly(Assembly assembly)
     {
         var changedContractTypes = new HashSet<Type>();
@@ -500,6 +624,12 @@ public class ExportComponentManager
             }
     }
 
+    /// <summary>
+    /// Registers a component that no assembly declares.
+    /// </summary>
+    /// <typeparam name="T">Contract type.</typeparam>
+    /// <param name="component">Component to register.</param>
+    /// <exception cref="InvalidOperationException">An export with the same location is already registered.</exception>
     public void Register<T>(ExportComponent<T> component) => Register((ExportComponent)component);
     private void Register(ExportComponent component, bool skipExisting = false, bool skipEvent = false)
     {
@@ -526,6 +656,11 @@ public class ExportComponentManager
         if (!skipEvent)
             RaiseExportCollectionChanged([component.ContractType]);
     }
+    /// <summary>
+    /// Removes the export with the given location.
+    /// </summary>
+    /// <param name="location">Export URI.</param>
+    /// <returns><c>true</c> when an export was removed.</returns>
     public bool Unregister(Uri location)
     {
         if (location == null)
@@ -566,6 +701,11 @@ public class ExportComponentManager
 
         return false;
     }
+    /// <summary>
+    /// Removes a registered component. Exports that come from an assembly stay untouched.
+    /// </summary>
+    /// <param name="component">Component to remove.</param>
+    /// <returns><c>true</c> when the component was removed.</returns>
     public bool Unregister(ExportComponent component)
     {
         if (component == null)
@@ -577,6 +717,12 @@ public class ExportComponentManager
         RaiseExportCollectionChanged([component.ContractType]);
         return true;
     }
+    /// <summary>
+    /// Removes a component without raising <see cref="ExportCollectionChanged"/>.
+    /// </summary>
+    /// <param name="component">Component to remove.</param>
+    /// <param name="force"><c>true</c> to remove the component even when it comes from an assembly.</param>
+    /// <returns><c>true</c> when the component was removed.</returns>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public bool UnregisterCore(ExportComponent component, bool force)
     {
@@ -605,6 +751,11 @@ public class ExportComponentManager
         return false;
     }
 
+    /// <summary>
+    /// Adds a handler called when the exports of the given contract type change.
+    /// </summary>
+    /// <param name="contractType">Contract type to watch.</param>
+    /// <param name="handler">Handler to add.</param>
     public void AddNotify(Type contractType, EventHandler handler)
     {
         lock (_events)
@@ -613,6 +764,11 @@ public class ExportComponentManager
             _events[contractType] = (EventHandler)Delegate.Combine(handlers, handler);
         }
     }
+    /// <summary>
+    /// Removes a handler added by <see cref="AddNotify"/>.
+    /// </summary>
+    /// <param name="contractType">Watched contract type.</param>
+    /// <param name="handler">Handler to remove.</param>
     public void RemoveNotify(Type contractType, EventHandler handler)
     {
         lock (_events)
@@ -649,6 +805,11 @@ public class ExportComponentManager
         }
     }
 
+    /// <summary>
+    /// Replaces the resolver that turns a contract type name from a cache file into a type.
+    /// </summary>
+    /// <param name="typeResolver">Resolver called with an assembly qualified type name. Default: <see cref="Type.GetType(string)"/>.</param>
+    /// <remarks>A resolver that returns <c>null</c> makes the container ignore the cache file and reflect over the assembly.</remarks>
     public void UseCustomTypeResolver(Func<string, Type> typeResolver)
     {
         _typeResolver = typeResolver ?? throw new ArgumentNullException(nameof(typeResolver));
@@ -671,12 +832,28 @@ public class ExportComponentManager
 
     #region Cache
 
+    /// <summary>
+    /// Turns on the assembly cache, which replaces reflection over all types with reading one file per assembly.
+    /// </summary>
+    /// <param name="assemblyCacheDirectory">Directory with the cache files.</param>
+    /// <param name="deserializeFromFile">Reads an object of the given type from a file.</param>
+    /// <param name="serializeToFile">Writes an object to a file.</param>
+    /// <remarks>
+    /// Call before the first <see cref="LoadAssembly(Assembly)"/>. A cache file belongs to one build of an assembly, so a rebuilt
+    /// assembly is read through reflection again. An unreadable file falls back to reflection as well. A process that can write to
+    /// the directory decides which types the container creates, so keep the directory out of reach of untrusted users.
+    /// </remarks>
     public void UseCache(string assemblyCacheDirectory, Func<string, Type, object> deserializeFromFile, Action<string, object> serializeToFile)
     {
         AssemblyCacheDirectory = assemblyCacheDirectory ?? throw new ArgumentNullException(nameof(assemblyCacheDirectory));
         _deserializeFromFile = deserializeFromFile ?? throw new ArgumentNullException(nameof(deserializeFromFile));
         _serializeToFile = serializeToFile ?? throw new ArgumentNullException(nameof(serializeToFile));
     }
+    /// <summary>
+    /// Writes cache files for the assemblies that were loaded through reflection and deletes the files of their earlier builds.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"><see cref="UseCache"/> was not called.</exception>
+    /// <remarks>Call after startup, for example from a background task.</remarks>
     public void PrepareCache()
     {
         if (string.IsNullOrEmpty(AssemblyCacheDirectory))
