@@ -16,4 +16,4 @@ jobs:
     - uses: TagBites/actions/dotnet-build@master
       with:
         solution: TagBites.ComponentModel.Composition.slnx
-   #- uses: TagBites/actions/dotnet-test@master
+    - uses: TagBites/actions/dotnet-test@master

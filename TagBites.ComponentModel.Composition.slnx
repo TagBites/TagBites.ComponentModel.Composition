@@ -11,7 +11,6 @@
     <File Path="README.md" />
     <File Path="Version.props" />
   </Folder>
-  <Folder Name="/src/">
-    <Project Path="src/TagBites.ComponentModel.Composition/TagBites.ComponentModel.Composition.csproj" />
-  </Folder>
+  <Project Path="src/TagBites.ComponentModel.Composition/TagBites.ComponentModel.Composition.csproj" />
+  <Project Path="tests/TagBites.ComponentModel.Composition.Tests/TagBites.ComponentModel.Composition.Tests.csproj" />
 </Solution>
