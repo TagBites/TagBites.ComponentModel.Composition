@@ -26,6 +26,8 @@ public class NamedService : ITestService
     public string Name => "Named";
 }
 
+public class UnrelatedService;
+
 public interface IDuplicateService;
 
 [Export(typeof(IDuplicateService))]

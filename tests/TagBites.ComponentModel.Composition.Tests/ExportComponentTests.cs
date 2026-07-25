@@ -50,4 +50,18 @@ public class ExportComponentTests
 
         Assert.Equal(expected, component.Location);
     }
+
+    [Fact]
+    public void ValueTypeNotImplementingContract()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new ExportComponent<ITestService>(null, typeof(ITestService), typeof(UnrelatedService)));
+    }
+
+    [Fact]
+    public void ContractTypeNotMatchingGenericArgument()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new ExportComponent<ITestService>(null, typeof(IDuplicateService), typeof(DuplicateFirstService)));
+    }
 }
