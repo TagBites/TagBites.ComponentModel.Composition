@@ -15,5 +15,5 @@ jobs:
     - uses: actions/checkout@v2
     - uses: TagBites/actions/dotnet-build@master
       with:
-        solution: TagBites.ComponentModel.Composition.sln
+        solution: TagBites.ComponentModel.Composition.slnx
    #- uses: TagBites/actions/dotnet-test@master

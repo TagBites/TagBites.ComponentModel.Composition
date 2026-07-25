@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Package.props" />
+    <File Path="README.md" />
+    <File Path="Version.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/TagBites.ComponentModel.Composition/TagBites.ComponentModel.Composition.csproj" />
+  </Folder>
+</Solution>
