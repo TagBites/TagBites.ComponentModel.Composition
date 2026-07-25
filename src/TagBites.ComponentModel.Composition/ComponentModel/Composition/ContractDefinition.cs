@@ -3,9 +3,20 @@ using System.ComponentModel;
 
 namespace TagBites.ComponentModel.Composition;
 
+/// <summary>
+/// Contract of an export: a contract type with an optional contract name.
+/// </summary>
+/// <param name="contractName">Contract name, or <c>null</c> for the contract without a name.</param>
+/// <param name="contractType">Contract type.</param>
 public sealed class ContractDefinition(string? contractName, Type contractType)
 {
+    /// <summary>
+    /// Gets the contract name, or <c>null</c> when the contract has no name.
+    /// </summary>
     public string? ContractName { get; } = contractName;
+    /// <summary>
+    /// Gets the contract type.
+    /// </summary>
     public Type ContractType { get; } = contractType ?? throw new ArgumentNullException(nameof(contractType));
 
 
@@ -13,10 +24,12 @@ public sealed class ContractDefinition(string? contractName, Type contractType)
     {
         return ContractName == other.ContractName && ContractType == other.ContractType;
     }
+    /// <inheritdoc />
     public override bool Equals(object? obj)
     {
         return ReferenceEquals(this, obj) || obj is ContractDefinition other && Equals(other);
     }
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
