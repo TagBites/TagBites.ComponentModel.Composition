@@ -19,6 +19,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TagBites.ComponentModel.Composition\TagBites.ComponentModel.Composition.csproj" />
+    <ProjectReference Include="..\Plugins\TagBites.ComponentModel.Composition.Tests.Plugin\TagBites.ComponentModel.Composition.Tests.Plugin.csproj" />
+    <ProjectReference Include="..\Plugins\TagBites.ComponentModel.Composition.Tests.Plugin.Override\TagBites.ComponentModel.Composition.Tests.Plugin.Override.csproj" />
+    <ProjectReference Include="..\Plugins\TagBites.ComponentModel.Composition.Tests.Plugin.Remove\TagBites.ComponentModel.Composition.Tests.Plugin.Remove.csproj" />
   </ItemGroup>
 
 </Project>

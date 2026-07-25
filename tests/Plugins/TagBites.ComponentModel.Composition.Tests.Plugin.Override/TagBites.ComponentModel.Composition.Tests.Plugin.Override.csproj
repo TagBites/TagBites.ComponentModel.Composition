@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="JetBrains.Annotations" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\TagBites.ComponentModel.Composition\TagBites.ComponentModel.Composition.csproj" />
+    <ProjectReference Include="..\TagBites.ComponentModel.Composition.Tests.Plugin\TagBites.ComponentModel.Composition.Tests.Plugin.csproj" />
+  </ItemGroup>
+
+</Project>

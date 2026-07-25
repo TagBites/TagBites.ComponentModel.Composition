@@ -13,4 +13,9 @@
   </Folder>
   <Project Path="src/TagBites.ComponentModel.Composition/TagBites.ComponentModel.Composition.csproj" />
   <Project Path="tests/TagBites.ComponentModel.Composition.Tests/TagBites.ComponentModel.Composition.Tests.csproj" />
+  <Folder Name="/tests/Plugins/">
+    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin/TagBites.ComponentModel.Composition.Tests.Plugin.csproj" />
+    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin.Override/TagBites.ComponentModel.Composition.Tests.Plugin.Override.csproj" />
+    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin.Remove/TagBites.ComponentModel.Composition.Tests.Plugin.Remove.csproj" />
+  </Folder>
 </Solution>
