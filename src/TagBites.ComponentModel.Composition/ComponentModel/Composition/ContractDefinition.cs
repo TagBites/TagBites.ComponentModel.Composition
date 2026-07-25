@@ -1,23 +1,17 @@
 #nullable enable
-using System;
+using System.ComponentModel;
 
 namespace TagBites.ComponentModel.Composition;
 
-public sealed class ContractDefinition
+public sealed class ContractDefinition(string? contractName, Type contractType)
 {
-    public string? ContactName { get; }
-    public Type ContactType { get; }
-
-    public ContractDefinition(string? contactName, Type contactType)
-    {
-        ContactName = contactName;
-        ContactType = contactType ?? throw new ArgumentNullException(nameof(contactType));
-    }
+    public string? ContractName { get; } = contractName;
+    public Type ContractType { get; } = contractType ?? throw new ArgumentNullException(nameof(contractType));
 
 
     private bool Equals(ContractDefinition other)
     {
-        return ContactName == other.ContactName && ContactType == other.ContactType;
+        return ContractName == other.ContractName && ContractType == other.ContractType;
     }
     public override bool Equals(object? obj)
     {
@@ -27,10 +21,15 @@ public sealed class ContractDefinition
     {
         unchecked
         {
-            return ((ContactName != null ? ContactName.GetHashCode() : 0) * 397) ^ ContactType.GetHashCode();
+            return ((ContractName != null ? ContractName.GetHashCode() : 0) * 397) ^ ContractType.GetHashCode();
         }
     }
 
     public static bool operator ==(ContractDefinition? left, ContractDefinition? right) => Equals(left, right);
     public static bool operator !=(ContractDefinition? left, ContractDefinition? right) => !Equals(left, right);
+
+    [Obsolete("Use ContractName instead."), EditorBrowsable(EditorBrowsableState.Never)]
+    public string? ContactName => ContractName;
+    [Obsolete("Use ContractType instead."), EditorBrowsable(EditorBrowsableState.Never)]
+    public Type ContactType => ContractType;
 }

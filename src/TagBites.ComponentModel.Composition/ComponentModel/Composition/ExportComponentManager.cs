@@ -121,7 +121,7 @@ public class ExportComponentManager
 
     public IEnumerable<object> GetExportInstances(ContractDefinition contract)
     {
-        return GetExportInstances(contract.ContactName, contract.ContactType);
+        return GetExportInstances(contract.ContractName, contract.ContractType);
     }
     public IEnumerable<object> GetExportInstances(Type contractType)
     {
@@ -134,7 +134,7 @@ public class ExportComponentManager
     }
     public IEnumerable<object> CreateExportInstances(ContractDefinition contract)
     {
-        return CreateExportInstances(contract.ContactName, contract.ContactType);
+        return CreateExportInstances(contract.ContractName, contract.ContractType);
     }
     public IEnumerable<object> CreateExportInstances(Type contractType)
     {
@@ -150,7 +150,7 @@ public class ExportComponentManager
         if (contract == null)
             throw new ArgumentNullException(nameof(contract));
 
-        return GetExports(contract.ContactName, contract.ContactType);
+        return GetExports(contract.ContractName, contract.ContractType);
     }
     public IEnumerable<ExportComponent> GetExports(Type contractType)
     {
