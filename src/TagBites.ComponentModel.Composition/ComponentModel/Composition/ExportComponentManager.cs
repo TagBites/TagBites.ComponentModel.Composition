@@ -180,7 +180,7 @@ public class ExportComponentManager
         foreach (var export in GetManyExports<T>(contractNames))
             yield return export.Instance;
     }
-    public IEnumerable<T> TryCreateManyExportInstances<T>(string[] contractNames)
+    public IEnumerable<T> CreateManyExportInstances<T>(string[] contractNames)
     {
         foreach (var export in GetManyExports<T>(contractNames))
             yield return export.CreateInstance();
@@ -191,7 +191,7 @@ public class ExportComponentManager
             yield return (ExportComponent<T>)component;
     }
 
-    public IEnumerable<object> TryCreateManyExportInstances(string[] contractNames, Type contractType)
+    public IEnumerable<object> CreateManyExportInstances(string[] contractNames, Type contractType)
     {
         foreach (var export in GetManyExports(contractNames, contractType))
             yield return export.CreateInstance();
@@ -283,6 +283,14 @@ public class ExportComponentManager
 
         return items;
     }
+
+    [Obsolete("Use CreateManyExportInstances instead.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public IEnumerable<T> TryCreateManyExportInstances<T>(string[] contractNames) => CreateManyExportInstances<T>(contractNames);
+
+    [Obsolete("Use CreateManyExportInstances instead.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public IEnumerable<object> TryCreateManyExportInstances(string[] contractNames, Type contractType) => CreateManyExportInstances(contractNames, contractType);
 
     #endregion
 
