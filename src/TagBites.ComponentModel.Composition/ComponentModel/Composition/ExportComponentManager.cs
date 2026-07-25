@@ -2,9 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
 using System.Reflection;
-#if NETCOREAPP
-using System.Runtime.Loader;
-#endif
+using System.Text.RegularExpressions;
 
 namespace TagBites.ComponentModel.Composition;
 
@@ -322,7 +320,7 @@ public class ExportComponentManager
             {
                 var items = new List<ExportComponentDefinition>();
 
-                // Load form cache
+                // Load from cache
                 var cache = TryGetAssemblyCacheModel(assembly);
                 var loadFromCache = cache != null;
 
@@ -707,6 +705,7 @@ public class ExportComponentManager
 
         // Serialize to files
         var directoryPrepared = false;
+        Dictionary<string, string> savedFiles = null;
 
         foreach (var assemblyGroup in assemblies)
         {
@@ -742,8 +741,15 @@ public class ExportComponentManager
 
                 // Save
                 _serializeToFile(fileName, model);
+
+                savedFiles ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                savedFiles[assembly.GetName().Name] = fileName;
             }
         }
+
+        // Clean up
+        if (savedFiles != null)
+            RemoveStaleCacheFiles(savedFiles);
     }
 
     private string GetAssemblyCacheFileName(Assembly assembly)
@@ -777,6 +783,26 @@ public class ExportComponentManager
         }
 
         return null;
+    }
+
+    private void RemoveStaleCacheFiles(Dictionary<string, string> currentFileNames)
+    {
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(AssemblyCacheDirectory, "*.json"))
+            {
+                var match = Regex.Match(Path.GetFileNameWithoutExtension(file), @"^(.+)-\d+(\.\d+){1,3}-[0-9a-f]{32}$");
+                if (!match.Success)
+                    continue;
+
+                if (currentFileNames.TryGetValue(match.Groups[1].Value, out var currentFileName)
+                    && !string.Equals(file, currentFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Delete(file);
+                }
+            }
+        }
+        catch { /* ignored */ }
     }
 
     #endregion
