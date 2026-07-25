@@ -13,6 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: TagBites/actions/dotnet-build@master
+    - uses: TagBites/actions/dotnet-test@master
     - uses: TagBites/actions/nuget-publish@master
       with:
         nuget-source: "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
