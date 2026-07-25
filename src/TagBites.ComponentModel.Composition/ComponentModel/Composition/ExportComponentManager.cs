@@ -16,7 +16,7 @@ public class ExportComponentManager
 {
     #region Events
 
-    private readonly EventHandlerList _events = new();
+    private readonly Dictionary<Type, EventHandler> _events = new();
 
     public event EventHandler<ExportCollectionChangedEventArgs> ExportCollectionChanged;
 
@@ -595,12 +595,25 @@ public class ExportComponentManager
     public void AddNotify(Type contractType, EventHandler handler)
     {
         lock (_events)
-            _events.AddHandler(contractType, handler);
+        {
+            _events.TryGetValue(contractType, out var handlers);
+            _events[contractType] = (EventHandler)Delegate.Combine(handlers, handler);
+        }
     }
     public void RemoveNotify(Type contractType, EventHandler handler)
     {
         lock (_events)
-            _events.RemoveHandler(contractType, handler);
+        {
+            if (_events.TryGetValue(contractType, out var handlers))
+            {
+                handlers = (EventHandler)Delegate.Remove(handlers, handler);
+
+                if (handlers != null)
+                    _events[contractType] = handlers;
+                else
+                    _events.Remove(contractType);
+            }
+        }
     }
 
     private void RaiseExportCollectionChanged(IList<Type> changedContractsTypes)
@@ -615,7 +628,7 @@ public class ExportComponentManager
             {
                 EventHandler neh;
                 lock (_events)
-                    neh = (EventHandler)_events[contractType];
+                    _events.TryGetValue(contractType, out neh);
 
                 if (neh != null)
                     neh.Invoke(this, EventArgs.Empty);
