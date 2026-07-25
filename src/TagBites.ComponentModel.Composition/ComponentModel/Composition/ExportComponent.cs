@@ -44,24 +44,27 @@ public class ExportComponent
     public Assembly OriginAssembly => _originAssembly ?? ValueTypeAssembly;
 
     /// <summary>
-    /// Gets instance.
+    /// Gets shared instance.
     /// </summary>
+    /// <remarks>
+    /// The instance is held by a weak reference. When the garbage collector reclaims it, the next access creates a new one.
+    /// </remarks>
     public object Instance
     {
         get
         {
-            object target = null;
-
-            if (_instance != null)
-                target = _instance.Target;
-
-            if (target == null)
+            lock (Definition)
             {
-                target = CreateInstance();
-                _instance = new WeakReference(target);
-            }
+                var target = _instance?.Target;
 
-            return target;
+                if (target == null)
+                {
+                    target = CreateInstance();
+                    _instance = new WeakReference(target);
+                }
+
+                return target;
+            }
         }
     }
 
