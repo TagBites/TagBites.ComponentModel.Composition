@@ -4,18 +4,28 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Folder Name="/Solution Items/">
+  <Folder Name="/.github/">
+    <File Path=".github/workflows/build-and-test.yml" />
+    <File Path=".github/workflows/publish-preview.yml" />
+    <File Path=".github/workflows/publish.yml" />
+  </Folder>
+  <Folder Name="/.root/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="CHANGELOG.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
-    <File Path="Package.props" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
     <File Path="README.md" />
-    <File Path="Version.props" />
+    <File Path="SECURITY.md" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Plugins/">
+    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin.Override/TagBites.ComponentModel.Composition.Tests.Plugin.Override.csproj" />
+    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin.Remove/TagBites.ComponentModel.Composition.Tests.Plugin.Remove.csproj" />
+    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin/TagBites.ComponentModel.Composition.Tests.Plugin.csproj" />
   </Folder>
   <Project Path="src/TagBites.ComponentModel.Composition/TagBites.ComponentModel.Composition.csproj" />
   <Project Path="tests/TagBites.ComponentModel.Composition.Tests/TagBites.ComponentModel.Composition.Tests.csproj" />
-  <Folder Name="/tests/Plugins/">
-    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin/TagBites.ComponentModel.Composition.Tests.Plugin.csproj" />
-    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin.Override/TagBites.ComponentModel.Composition.Tests.Plugin.Override.csproj" />
-    <Project Path="tests/Plugins/TagBites.ComponentModel.Composition.Tests.Plugin.Remove/TagBites.ComponentModel.Composition.Tests.Plugin.Remove.csproj" />
-  </Folder>
 </Solution>

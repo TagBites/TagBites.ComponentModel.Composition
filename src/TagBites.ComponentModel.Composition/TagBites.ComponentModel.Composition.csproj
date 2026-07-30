@@ -9,18 +9,25 @@
   <!-- Build -->
   <PropertyGroup>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
-  <!-- README -->
-  <ItemGroup>
-    <None Include="..\..\README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
-  
+  <!-- Package info -->
+  <PropertyGroup>
+    <Description>Lightweight export container for plugin-based .NET applications. Discovers types marked with the MEF Export attribute and resolves them by contract type, contract name or URI.</Description>
+    <PackageTags>mef; composition; export; container; plugin; plugins; addin; extensibility; discovery</PackageTags>
+    <PackageProjectUrl>https://tagbites.com/composition/</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- References -->
   <ItemGroup>
     <PackageReference Include="System.ComponentModel.Composition" Version="4.6.0" />
+  </ItemGroup>
+
+  <!-- Usings -->
+  <ItemGroup>
+    <Using Include="JetBrains.Annotations" />
   </ItemGroup>
 
 </Project>
