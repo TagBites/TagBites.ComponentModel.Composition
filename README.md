@@ -2,7 +2,7 @@
 
 [![Nuget](https://img.shields.io/nuget/v/TagBites.ComponentModel.Composition.svg)](https://www.nuget.org/packages/TagBites.ComponentModel.Composition/)
 [![Build](https://img.shields.io/github/actions/workflow/status/TagBites/TagBites.ComponentModel.Composition/build-and-test.yml?branch=master)](https://github.com/TagBites/TagBites.ComponentModel.Composition/actions)
-[![License](https://img.shields.io/github/license/TagBites/TagBites.ComponentModel.Composition)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/TagBites/TagBites.ComponentModel.Composition)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE.md)
 
 A lightweight export container for plugin-based .NET applications. The container discovers types marked with the MEF `[Export]` attribute and gives access to them by contract type, contract name or URI.
 
@@ -180,4 +180,4 @@ manager.PrepareCache();
 
 - [Changelog](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/CHANGELOG.md)
 - [Security policy](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/SECURITY.md)
-- [License (MIT)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE)
+- [License (Apache-2.0)](https://github.com/TagBites/TagBites.ComponentModel.Composition/blob/master/LICENSE.md)

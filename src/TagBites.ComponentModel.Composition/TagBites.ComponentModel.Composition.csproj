@@ -17,7 +17,7 @@
     <Description>Lightweight export container for plugin-based .NET applications. Discovers types marked with the MEF Export attribute and resolves them by contract type, contract name or URI.</Description>
     <PackageTags>mef; composition; export; container; plugin; plugins; addin; extensibility; discovery</PackageTags>
     <PackageProjectUrl>https://tagbites.com/composition/</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 
   <!-- References -->
